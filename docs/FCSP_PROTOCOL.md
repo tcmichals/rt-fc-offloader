@@ -118,6 +118,7 @@ FCSP is transport-agnostic at framing level, but FCSP/1 is profiled for SPI.
 | `0x10` | `READ_BLOCK` | `space:u8, address:u32, len:u16` | `result:u8, len:u16, data:bytes[len]` |
 | `0x11` | `WRITE_BLOCK` | `space:u8, address:u32, len:u16, data:bytes[len]` | `result:u8, bytes_written:u16` |
 | `0x12` | `GET_CAPS` | none | `result:u8, caps_len:u16, caps_tlv:caps_len bytes` |
+| `0x13` | `HELLO` | `client_hello_len:u16, client_hello_tlv:bytes` | `result:u8, hello_len:u16, hello_tlv:bytes` |
 
 `result` codes (`u8`):
 
@@ -142,6 +143,23 @@ FCSP is transport-agnostic at framing level, but FCSP/1 is profiled for SPI.
 
 This model enables adding new features without adding a dedicated op for each one.
 
+### Unified IO domains (PWM / DSHOT / LED / NeoPixel)
+
+Use FCSP block operations for all IO domains so clients follow one access pattern:
+
+- discover capabilities/counts via `HELLO` + `GET_CAPS`
+- read state via `READ_BLOCK(space, address, len)`
+- write commands/config via `WRITE_BLOCK(space, address, len, data)`
+
+Recommended standard `space` assignments:
+
+- `0x10` PWM_IO      — PWM capture/config/state window
+- `0x11` DSHOT_IO    — DSHOT command/config/state window
+- `0x12` LED_IO      — generic discrete/status LED control
+- `0x13` NEO_IO      — NeoPixel/WS2812 strip control and framebuffer windows
+
+These values are part of FCSP/1 profile guidance and should be treated as stable once implemented.
+
 ### Dynamic capability discovery (GET_CAPS)
 
 `GET_CAPS` returns TLV records so clients can enable features dynamically.
@@ -160,6 +178,110 @@ Initial TLV types:
 - `0x04` max write block length (`u16`)
 - `0x05` protocol profile string (UTF-8, e.g. `SERV8-50-SPIPROD`)
 - `0x06` feature flags (`u32` bitfield)
+
+Recommended IO discovery TLVs:
+
+- `0x10` pwm_channel_count (`u16`)
+- `0x11` dshot_motor_count (`u16`)
+- `0x12` led_count (`u16`)
+- `0x13` neopixel_count (`u16`)
+- `0x14` supported_io_spaces bitmap/chunk
+
+This allows both sides to adapt dynamically (for example, different LED/NeoPixel counts) without GUI protocol redesign.
+
+## Discovery model
+
+FCSP discovery has two layers:
+
+1. **Protocol discovery (required)** via `HELLO` + `GET_CAPS`
+2. **Network service discovery (optional)** via mDNS when FCSP is exposed on IP transports
+
+## Shared schema size strategy (keep one schema, keep it small)
+
+Yes — FCSP should use one shared schema across transports, but with a compact profile.
+
+Use this pattern:
+
+1. **Fixed tiny core**: frame header + `op_id` + compact primitive fields
+2. **TLV extensions**: optional data only when needed
+3. **Capability paging**: do not send giant capability blobs in one response
+
+### Compact profile rules
+
+- Keep common request/response bodies <= 32 bytes when possible.
+- Prefer integer enums/bitfields over long strings on wire.
+- Return counts/limits first; fetch details on demand.
+- Use `GET_CAPS` pagination for large capability sets.
+
+### GET_CAPS pagination
+
+`GET_CAPS` request payload (optional):
+
+- `page:u8` (default `0`)
+- `max_len:u16` (default implementation max)
+
+`GET_CAPS` response additional fields:
+
+- `page:u8`
+- `has_more:u8` (`0`/`1`)
+- `caps_len:u16`
+- `caps_tlv:caps_len bytes`
+
+This keeps discovery bounded for low-memory endpoints.
+
+### Schema/version identity
+
+Add a short schema identity TLV in `HELLO`/`GET_CAPS`:
+
+- `schema_id:u16` (e.g. `0x0001` for FCSP/1 core)
+- `schema_hash:u32` (optional quick compatibility hash)
+
+Clients should gate optional features by `schema_id` + capability TLVs, not by hardcoded board names.
+
+### 1) Protocol discovery (required)
+
+All FCSP endpoints should support:
+
+- `HELLO` (`op_id=0x13`) for identity/session metadata
+- `GET_CAPS` (`op_id=0x12`) for machine-readable feature negotiation
+
+`HELLO` TLV format (`hello_tlv`):
+
+- `type:u8`
+- `len:u8`
+- `value:len bytes`
+
+Recommended `HELLO` TLVs:
+
+- `0x01` endpoint role (`u8`): `1=offloader`, `2=flight-controller`, `3=sim`
+- `0x02` endpoint name (UTF-8), e.g. `fcsp-offloader-01`
+- `0x03` protocol family/version string (UTF-8), e.g. `FCSP/1`
+- `0x04` profile string (UTF-8), e.g. `SERV8-50-SPIPROD`
+- `0x05` instance id (`u32`) boot/session identifier
+- `0x06` uptime ms (`u32`)
+
+Notes:
+
+- `HELLO` is link-agnostic and works for SPI and non-SPI transports.
+- Unknown TLV types must be ignored (forward compatibility).
+
+### 2) Network service discovery (optional mDNS)
+
+When FCSP is bridged/exposed over IP (TCP/UDP) for tooling/simulation, mDNS may be used.
+
+- Suggested service type: `_fcsp._tcp.local`
+- Suggested instance name: `<endpoint-name>._fcsp._tcp.local`
+- Suggested TXT records:
+	- `proto=FCSP/1`
+	- `role=offloader|sim|controller`
+	- `profile=SERV8-50-SPIPROD`
+	- `caps_hash=<hex>`
+	- `build=<short-id>`
+
+Important scope rule:
+
+- mDNS is only for IP-discovery convenience.
+- It does **not** replace protocol-level discovery and is not applicable to raw SPI links.
 
 ## Functional mapping matrix (MSP/4-way → FCSP)
 

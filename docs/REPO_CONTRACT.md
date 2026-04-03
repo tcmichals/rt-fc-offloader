@@ -22,6 +22,7 @@ This document defines how both repositories evolve FCSP in parallel.
 3. SPI/FCSP wire transport is scoped to the offloader↔flight-controller link.
 4. Channel IDs, flags, and CRC behavior must match FCSP/1 exactly.
 5. Any FCSP wire change requires coordinated implementation updates in both repos and a single spec update in this repo only.
+6. Discovery compatibility must be preserved: `HELLO` + `GET_CAPS` are required; mDNS is optional for IP-exposed transports only.
 
 ## Feature parity goals
 
