@@ -1,0 +1,40 @@
+{
+  "schema": "fcsp-command-map/v1",
+  "canonical_spec": "docs/FCSP_PROTOCOL.md",
+  "notes": [
+    "This map translates feature-intent commands to FCSP operations.",
+    "It is protocol-name based to avoid hard-coding legacy numeric IDs where not required."
+  ],
+  "mappings": [
+    {
+      "intent": "passthrough_enter",
+      "legacy": {"protocol": "MSP", "command": "MSP_SET_PASSTHROUGH"},
+      "fcsp": {"channel": "CONTROL", "op": "PT_ENTER", "payload": ["motor_index:u8"]}
+    },
+    {
+      "intent": "passthrough_exit",
+      "legacy": {"protocol": "MSP", "command": "MSP_SET_PASSTHROUGH"},
+      "fcsp": {"channel": "CONTROL", "op": "PT_EXIT", "payload": []}
+    },
+    {
+      "intent": "esc_scan",
+      "legacy": {"protocol": "MSP", "command": "MSP_SET_PASSTHROUGH"},
+      "fcsp": {"channel": "CONTROL", "op": "ESC_SCAN", "payload": ["motor_index:u8"]}
+    },
+    {
+      "intent": "set_motor_speed",
+      "legacy": {"protocol": "MSP", "command": "MSP_SET_MOTOR"},
+      "fcsp": {"channel": "CONTROL", "op": "SET_MOTOR_SPEED", "payload": ["motor_index:u8", "speed:u16"]}
+    },
+    {
+      "intent": "get_link_status",
+      "legacy": {"protocol": "GENERIC", "command": "LINK_STATUS"},
+      "fcsp": {"channel": "CONTROL", "op": "GET_LINK_STATUS", "payload": []}
+    },
+    {
+      "intent": "ping",
+      "legacy": {"protocol": "GENERIC", "command": "PING"},
+      "fcsp": {"channel": "CONTROL", "op": "PING", "payload": ["nonce:u32"]}
+    }
+  ]
+}

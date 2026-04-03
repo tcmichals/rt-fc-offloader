@@ -257,7 +257,7 @@ class StreamParser:
     - on failure advances by one byte and continues
     """
 
-    def __init__(self, *, max_payload_len: int = 4096) -> None:
+    def __init__(self, *, max_payload_len: int = 512) -> None:
         self._buf = bytearray()
         self._max_payload_len = max_payload_len
 

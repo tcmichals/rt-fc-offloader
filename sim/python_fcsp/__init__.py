@@ -31,6 +31,12 @@ from .fcsp_codec import (
     parse_get_caps_response,
     StreamParser,
 )
+from .command_adapter import (
+    LegacyIntent,
+    FcspCommand,
+    build_fcsp_command,
+    build_fcsp_frame_for_intent,
+)
 
 __all__ = [
     "FCSP_SYNC",
@@ -58,4 +64,8 @@ __all__ = [
     "build_get_caps_response",
     "parse_get_caps_response",
     "StreamParser",
+    "LegacyIntent",
+    "FcspCommand",
+    "build_fcsp_command",
+    "build_fcsp_frame_for_intent",
 ]

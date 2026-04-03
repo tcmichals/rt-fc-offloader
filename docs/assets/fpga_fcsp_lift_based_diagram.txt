@@ -1,0 +1,88 @@
+FPGA FCSP Offloader Diagram (Lift-Based View)
+Legend: [LIFT] reusable from legacy RTL, [ADAPT] reusable with interface changes, [NEW] FCSP-specific
+
+============================== TRANSPORT INGRESSES (SEPARATE LANES) ==============================
+
+SPI LANE (left)                                          USB SERIAL LANE (right)
+----------------                                         ------------------------
+Host/FC SPI bytes                                        Host/FC USB CDC/UART bytes
+  |                                                            |
+  v                                                            v
++-----------------------------------+                   +-----------------------------------+
+| SPI Front-End                     |                   | USB Serial Front-End              |
+| [LIFT/ADAPT] spi_slave + bridge   |                   | [ADAPT/NEW] cdc-uart byte bridge  |
++----------------+------------------+                   +----------------+------------------+
+         |                                                       |
+         +--------------------------+----------------------------+
+                |
+                v
+          +-----------------------------------+
+          | RX Transport Arbiter              |
+          | [NEW] selects active ingress      |
+          +----------------+------------------+
+               |
+               v
+
++-----------------------------------+
+| FCSP Parser                        |
+| [NEW] sync/header/len resync       |
++----------------+------------------+
+                 |
+                 v
++-----------------------------------+
+| CRC16/XMODEM Gate                  |
+| [LIFT/ADAPT] crc16_xmodem wrapper  |
++----------------+------------------+
+                 |
+                 v
++-----------------------------------+
+| Channel Router                     |
+| [NEW] CONTROL/TELEM/LOG/DBG/ESC    |
++----+----------+--------+---------+
+     |          |        |         \
+     v          v        v          v
+ +--------+  +------+  +------+  +----------+
+ |CTRL RX |  |TEL RX|  |LOG RX|  |DBG/ESC RX|
+ | FIFO   |  | FIFO |  | FIFO |  | FIFO      |
+ |[ADAPT] |  |[ADAPT]| |[ADAPT]| |[ADAPT]    |
+ +---+----+  +--+---+  +--+---+  +-----+-----+
+     |          |         |             |
+     |          |         |             |
+     +----------+---------+-------------+
+                |
+                v
++-----------------------------------+
+| TX Priority Mux + FCSP TX Framer   |
+| [ADAPT/NEW] stream framer patterns |
++----------------+------------------+
+                 |
+                 v
+           +-----------------------------------+
+           | TX Transport Mux                  |
+           | [NEW] route to SPI or USB serial  |
+           +-----------+-----------------------+
+             |
+       +--------------------+---------------------+
+       |                                          |
+       v                                          v
+     SPI LANE TX                                 USB SERIAL LANE TX
+     -----------                                 ------------------
+     SPI TX bytes                                USB CDC/UART bytes
+
+Control-plane side path (not in raw SPI hot path):
+
+CTRL RX FIFO -> SERV8 Control Dispatch [ADAPT firmware flow]
+                |
+                +-> IO Windows [ADAPT]
+                    - DSHOT_IO: [LIFT/ADAPT] dshot_out + mailbox + controller
+                    - PWM_IO/LED_IO/NEO_IO: [ADAPT]
+                |
+                +-> Status Counters [NEW]
+                |
+                +-> Response Payloads -> TX Mux
+
+Key rule:
+- Raw SPI hot path is RTL-only: SPI Front-End -> Parser -> CRC -> Router -> FIFOs.
+- SERV8 only handles validated CONTROL frames.
+- USB serial path is an alternate transport ingress/egress feeding the same FCSP parser/router semantics.
+- Both lanes share one FCSP semantic pipeline after RX arbitration.

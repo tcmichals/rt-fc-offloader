@@ -1,0 +1,36 @@
+FCSP Command Translation (INAV/Betaflight -> FCSP)
+
++-----------------------------+
+| Legacy Command              |
+| MSP / stack-specific IDs    |
+| + raw payload bytes         |
++-------------+---------------+
+              |
+              | normalize
+              v
++-----------------------------+
+| Internal Intent             |
+| e.g. passthrough_enter      |
+|      set_motor_speed        |
+|      ping                   |
++-------------+---------------+
+              |
+              | map
+              v
++-----------------------------+
+| FCSP CONTROL payload        |
+| op_id:u8 + op-specific data |
+| multi-byte values: big-end. |
++-------------+---------------+
+              |
+              | wrap
+              v
++-----------------------------+
+| FCSP frame                  |
+| sync/ver/fl/ch/seq/len/...  |
+| payload + crc16             |
++-------------+---------------+
+              |
+              | transport
+              v
+        SPI (primary profile)

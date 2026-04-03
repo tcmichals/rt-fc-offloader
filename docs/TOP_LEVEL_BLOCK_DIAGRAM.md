@@ -7,11 +7,14 @@ Use this as the canonical top-level block diagram for FPGA datapath/control revi
 Related docs:
 
 - `docs/FPGA_BLOCK_DESIGN.md` (expanded architecture details)
+- `docs/assets/fpga_fcsp_lift_based_diagram.txt` (text-first diagram showing reusable/liftable legacy blocks)
 - `external/python-imgui-esc-configurator/docs/architecture.md` (historical/supporting context in submodule)
 
 ```mermaid
 flowchart LR
-    SPI[SPI Front-End\nRX/TX Byte Stream] --> PARSER[FCSP Parser\nSync + Header + Length]
+    SPI[SPI Front-End\nRX/TX Byte Stream] --> RXARB[RX Transport Arbiter]
+    USB[USB Serial Front-End\nCDC/UART Byte Stream] --> RXARB
+    RXARB --> PARSER[FCSP Parser\nSync + Header + Length]
     PARSER --> CRC[CRC16/XMODEM Gate\nFrame Valid/Invalid]
     CRC --> ROUTER[Channel Router]
 
@@ -30,7 +33,9 @@ flowchart LR
     Q5 --> TXMUX
 
     TXMUX --> TXFR[FCSP TX Framer\nHeader + CRC16]
-    TXFR --> SPI
+    TXFR --> TXSEL[TX Transport Mux]
+    TXSEL --> SPI
+    TXSEL --> USB
 
     SERV --> IOSPACE[Block IO Windows\nPWM/DSHOT/LED/NEO]
     SERV --> STATUS[Error + Link Counters]
@@ -41,6 +46,15 @@ flowchart LR
 
 - **Hot SPI path is RTL-only** (`Parser -> CRC -> Router -> FIFOs`).
 - **SERV is not in raw-byte path**; it handles validated CONTROL frames and policy.
+- **USB serial is optional alternate transport** and must converge to the same FCSP parser/router semantics.
+
+## Lift-first text view
+
+If you want a review-friendly FPGA diagram with explicit `LIFT / ADAPT / NEW` tags, use:
+
+- `docs/assets/fpga_fcsp_lift_based_diagram.txt`
+
+Reading tip: the text diagram is drawn as two clearly separated lanes (`SPI LANE` on the left, `USB SERIAL LANE` on the right) that merge only at `RX Transport Arbiter`.
 
 ## Minimal interface boundary
 

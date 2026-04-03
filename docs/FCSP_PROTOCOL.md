@@ -70,6 +70,14 @@ All multi-byte integers are big-endian.
 
 Total length = `1 + 1 + 1 + 1 + 2 + 2 + payload_len + 2`.
 
+### FCSP/1 implementation profile limit (current project)
+
+For deterministic buffer sizing in the current offloader profile, implementations in this project use:
+
+- `max_payload_len = 512` bytes
+
+Wire format still uses `u16` `payload_len`, but frames above 512 bytes are rejected by parser/profile policy.
+
 ## Flags (FCSP/1)
 
 - `0x01` ACK requested
@@ -86,6 +94,10 @@ Total length = `1 + 1 + 1 + 1 + 2 + 2 + payload_len + 2`.
 - `0x05` ESC_SERIAL — passthrough tunnel (MSP/4-way bridge payload)
 
 ## SPI transport mapping (FCSP over SPI)
+
+Detailed transport profile:
+
+- `docs/FCSP_SPI_TRANSPORT.md`
 
 FCSP is transport-agnostic at framing level, but FCSP/1 is profiled for SPI.
 
