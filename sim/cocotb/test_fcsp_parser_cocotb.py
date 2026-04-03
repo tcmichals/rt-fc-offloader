@@ -2,7 +2,7 @@
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge
+from cocotb.triggers import RisingEdge, ReadOnly, NextTimeStep
 
 from python_fcsp.fcsp_codec import encode_frame
 
@@ -22,8 +22,26 @@ async def _drive_bytes(dut, data: bytes) -> None:
         dut.in_valid.value = 1
         dut.in_byte.value = b
         await RisingEdge(dut.clk)
+        await ReadOnly()
+        await NextTimeStep()
     dut.in_valid.value = 0
     await RisingEdge(dut.clk)
+    await ReadOnly()
+    await NextTimeStep()
+
+
+async def _drive_and_sample(dut, b: int) -> tuple[bool, bool, bool, int, int]:
+    dut.in_valid.value = 1
+    dut.in_byte.value = b
+    await RisingEdge(dut.clk)
+    await ReadOnly()
+    saw_sync = bool(dut.o_sync_seen.value)
+    saw_header = bool(dut.o_header_valid.value)
+    saw_done = bool(dut.o_frame_done.value)
+    payload_len = int(dut.o_payload_len.value)
+    body_remaining = int(dut.body_remaining.value)
+    await NextTimeStep()
+    return saw_sync, saw_header, saw_done, payload_len, body_remaining
 
 
 @cocotb.test()
@@ -40,18 +58,18 @@ async def parser_detects_sync_and_completes_frame(dut) -> None:
     observed_body_remaining = []
 
     for b in frame:
-        dut.in_valid.value = 1
-        dut.in_byte.value = b
-        await RisingEdge(dut.clk)
-        saw_sync |= bool(dut.o_sync_seen.value)
-        saw_header |= bool(dut.o_header_valid.value)
-        saw_done |= bool(dut.o_frame_done.value)
-        observed_body_remaining.append(int(dut.body_remaining.value))
-        if bool(dut.o_header_valid.value):
-            observed_payload_len.append(int(dut.o_payload_len.value))
+        s_sync, s_hdr, s_done, p_len, body_rem = await _drive_and_sample(dut, b)
+        saw_sync |= s_sync
+        saw_header |= s_hdr
+        saw_done |= s_done
+        observed_body_remaining.append(body_rem)
+        if s_hdr:
+            observed_payload_len.append(p_len)
 
     dut.in_valid.value = 0
     await RisingEdge(dut.clk)
+    await ReadOnly()
+    await NextTimeStep()
 
     assert saw_sync, "expected sync detection pulse"
     assert saw_header, "expected header_valid pulse"
@@ -72,13 +90,13 @@ async def parser_resyncs_after_noise(dut) -> None:
 
     saw_done = False
     for b in stream:
-        dut.in_valid.value = 1
-        dut.in_byte.value = b
-        await RisingEdge(dut.clk)
-        saw_done |= bool(dut.o_frame_done.value)
+        _s_sync, _s_hdr, s_done, _p_len, _body_rem = await _drive_and_sample(dut, b)
+        saw_done |= s_done
 
     dut.in_valid.value = 0
     await RisingEdge(dut.clk)
+    await ReadOnly()
+    await NextTimeStep()
     assert saw_done, "expected parser to recover and complete frame"
 
 
@@ -100,15 +118,15 @@ async def parser_rejects_payload_len_over_512(dut) -> None:
     saw_len_error = False
     observed_payload_len = []
     for b in header:
-        dut.in_valid.value = 1
-        dut.in_byte.value = b
-        await RisingEdge(dut.clk)
+        _s_sync, s_hdr, _s_done, p_len, _body_rem = await _drive_and_sample(dut, b)
         saw_len_error |= bool(dut.o_len_error.value)
-        if bool(dut.o_header_valid.value):
-            observed_payload_len.append(int(dut.o_payload_len.value))
+        if s_hdr:
+            observed_payload_len.append(p_len)
 
     dut.in_valid.value = 0
     await RisingEdge(dut.clk)
+    await ReadOnly()
+    await NextTimeStep()
 
     assert saw_len_error, (
         f"expected len_error pulse for payload > 512; header lens seen={observed_payload_len}"

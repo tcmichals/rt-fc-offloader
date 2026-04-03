@@ -42,6 +42,8 @@ At a high level FCSP provides:
 - deterministic parser behavior under noise and split bursts
 - channelized traffic model (`CONTROL`, `TELEMETRY`, `FC_LOG`, `DEBUG_TRACE`, `ESC_SERIAL`)
 - implementation-friendly semantics for FPGA/RTL pipelines
+- stream/multiplex semantics (multiple packets on wire, not strict send-and-wait)
+- safe intermixing of CONTROL with telemetry/log/debug channels on the same link
 
 Why FCSP here instead of relying only on MSP end-to-end:
 
@@ -69,6 +71,12 @@ Current project strategy:
 - **MSP path** is used first to validate GUI workflows, UX parity, and ESC feature behavior quickly.
 - **FCSP path** is the target runtime transport for deterministic FPGA-friendly framing/performance.
 
+Current practical validation status:
+
+- there is a **Pico-based MSP implementation** available for early ESC-config and workflow testing
+- that Pico/MSP path has already been tested with a **single ESC + motor**
+- this gives us a known-good bring-up path while the FCSP/FPGA offloader path is expanded
+
 ## Protocol role split (explicit)
 
 - **PICO project**: remains on **MSP** for rapid GUI/feature validation and parity checks.
@@ -86,7 +94,9 @@ Canonical spec:
 
 - `REQUIREMENTS.md` — clear offloader/FCSP requirements and quality gates
 - `GITHUB_TODO.md` — active GitHub task list for this repository
+- `docs/ENGINEERING_LOG.md` — running history of issues encountered, design decisions, and validation milestones
 - `docs/FPGA_BLOCK_DESIGN.md` — FCSP FPGA block architecture and module boundaries
+- `docs/PICO_PIO_IMPLEMENTATION_NOTES.md` — notes on how the Pico MSP/PIO bring-up path was structured and why
 - `docs/TOP_LEVEL_BLOCK_DIAGRAM.md` — quick-reference top-level FPGA datapath/control diagram
 - `docs/PYTHON_SUBMODULE_WORKFLOW.md` — companion Python-submodule workflow and FCSP sync pattern
 - `docs/FCSP_SPI_TRANSPORT.md` — synchronous SPI transport profile for FCSP framing/resync/buffering

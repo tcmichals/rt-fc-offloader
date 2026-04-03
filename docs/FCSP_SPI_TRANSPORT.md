@@ -19,6 +19,13 @@ Meaning:
 - one SPI burst may contain partial FCSP frame,
 - one burst may contain exactly one frame,
 - one burst may contain multiple concatenated frames.
+- command and background traffic (telemetry/log/debug) may be interleaved in the same stream.
+
+FCSP-over-SPI is therefore **streaming/multiplexed**, not send-one-wait-one:
+
+- do not assume a request must be immediately followed by its reply on wire
+- use channel/sequence/context to correlate control transactions
+- continue parsing and routing all frames as they arrive
 
 ## RX behavior requirements
 

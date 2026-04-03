@@ -19,7 +19,7 @@ module fcsp_parser #(
     output logic [15:0] o_payload_len
 );
     localparam logic [7:0] FCSP_SYNC = 8'hA5;
-    localparam logic [15:0] MAX_PAYLOAD_LEN_U16 = logic'(MAX_PAYLOAD_LEN[15:0]);
+    localparam logic [15:0] MAX_PAYLOAD_LEN_U16 = MAX_PAYLOAD_LEN[15:0];
 
     typedef enum logic [1:0] {
         S_SEARCH_SYNC = 2'd0,

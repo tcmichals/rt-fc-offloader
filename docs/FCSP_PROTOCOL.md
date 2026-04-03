@@ -37,6 +37,22 @@ Rule: changing physical layer must not change FCSP behavior semantics.
 - Transport profile: SPI byte stream on the **offloader↔flight-controller** link (no packet boundary assumptions)
 - Parse model: RTL fast-path + lightweight control-plane firmware
 
+## Streaming model (not send-and-wait)
+
+FCSP/1 is a **stream protocol**, not a strict lockstep request/reply protocol.
+
+Implications:
+
+- multiple FCSP frames may appear back-to-back on the same wire stream
+- command, telemetry, and logging frames may be intermixed in either direction
+- receivers must parse continuously and route by channel, not assume one outstanding request only
+
+Design intent:
+
+- enable high-rate runtime traffic without artificial stop-and-wait stalls
+- keep CONTROL latency deterministic while allowing background telemetry/log flow
+- map naturally to FPGA parser/router/FIFO pipelines and priority TX scheduling
+
 ## Link-layer scope (important)
 
 - FCSP/1 over SPI is the primary production profile for the **offloader ↔ flight-controller** path.
@@ -104,6 +120,7 @@ FCSP is transport-agnostic at framing level, but FCSP/1 is profiled for SPI.
 - Each SPI burst may contain partial frame bytes, one full frame, or multiple concatenated frames.
 - The receiver must treat SPI as a byte stream and run the FCSP resynchronization parser.
 - Padding is allowed only at burst boundaries, not inside a frame.
+- FCSP traffic classes can be intermixed on the wire stream (for example CONTROL requests/replies with `FC_LOG`/`TELEMETRY` frames).
 - Recommended host burst behavior at 50 MHz profile:
 	- prefer batched transfers with one or more complete frames per burst,
 	- avoid tiny single-byte bursts except for debug,
