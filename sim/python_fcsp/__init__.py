@@ -1,0 +1,61 @@
+"""Python FCSP protocol simulator package.
+
+This package provides a reference codec/parser that acts as a golden model
+for protocol tests and can be reused by companion Python adapter workflows.
+"""
+
+from .fcsp_codec import (
+    FCSP_SYNC,
+    FCSP_VERSION,
+    Channel,
+    ControlOp,
+    ResultCode,
+    Space,
+    Flags,
+    Frame,
+    Tlv,
+    crc16_xmodem,
+    encode_frame,
+    decode_frame,
+    build_control_payload,
+    parse_control_payload,
+    encode_tlvs,
+    decode_tlvs,
+    build_hello_request,
+    parse_hello_request,
+    build_hello_response,
+    parse_hello_response,
+    build_get_caps_request,
+    parse_get_caps_request,
+    build_get_caps_response,
+    parse_get_caps_response,
+    StreamParser,
+)
+
+__all__ = [
+    "FCSP_SYNC",
+    "FCSP_VERSION",
+    "Channel",
+    "ControlOp",
+    "ResultCode",
+    "Space",
+    "Flags",
+    "Frame",
+    "Tlv",
+    "crc16_xmodem",
+    "encode_frame",
+    "decode_frame",
+    "build_control_payload",
+    "parse_control_payload",
+    "encode_tlvs",
+    "decode_tlvs",
+    "build_hello_request",
+    "parse_hello_request",
+    "build_hello_response",
+    "parse_hello_response",
+    "build_get_caps_request",
+    "parse_get_caps_request",
+    "build_get_caps_response",
+    "parse_get_caps_response",
+    "StreamParser",
+]

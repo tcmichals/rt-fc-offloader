@@ -23,6 +23,10 @@ This document defines how both repositories evolve FCSP in parallel.
 4. Channel IDs, flags, and CRC behavior must match FCSP/1 exactly.
 5. Any FCSP wire change requires coordinated implementation updates in both repos and a single spec update in this repo only.
 6. Discovery compatibility must be preserved: `HELLO` + `GET_CAPS` are required; mDNS is optional for IP-exposed transports only.
+7. FPGA-side protocol/IO implementation code must be written in **SystemVerilog**.
+8. FPGA simulation/testbench verification stack is standardized on **Verilator + cocotb**.
+9. FCSP Python protocol simulator/golden-model artifacts in this repo must be reusable by companion Python adapter tests.
+10. A git submodule link to `python-imgui-esc-configurator` may be used for cross-repo protocol validation workflows.
 
 ## Feature parity goals
 
