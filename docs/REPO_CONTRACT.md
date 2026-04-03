@@ -18,9 +18,10 @@ This document defines how both repositories evolve FCSP in parallel.
 ## Cross-repo compatibility rules
 
 1. Python GUI behavior must not depend on MSP-only assumptions.
-2. Transport selection is worker-side only; GUI flow remains unchanged.
-3. Channel IDs, flags, and CRC behavior must match FCSP/1 exactly.
-4. Any FCSP wire change requires coordinated implementation updates in both repos and a single spec update in this repo only.
+2. Transport selection is worker/offloader-side only; GUI flow remains unchanged.
+3. SPI/FCSP wire transport is scoped to the offloader↔flight-controller link.
+4. Channel IDs, flags, and CRC behavior must match FCSP/1 exactly.
+5. Any FCSP wire change requires coordinated implementation updates in both repos and a single spec update in this repo only.
 
 ## Feature parity goals
 
