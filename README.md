@@ -21,4 +21,9 @@ Canonical spec:
 
 - `docs/FCSP_PROTOCOL.md` (**single source of truth; no duplicated copies in companion repos**)
 
+## Repository requirements and GitHub TODO
+
+- `REQUIREMENTS.md` — clear offloader/FCSP requirements and quality gates
+- `GITHUB_TODO.md` — active GitHub task list for this repository
+
 In short: MSP validates features quickly; FCSP is the long-term high-performance path.
