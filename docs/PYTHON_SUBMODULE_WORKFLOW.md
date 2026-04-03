@@ -21,6 +21,21 @@ Use this when you want protocol code/tests to be validated against the companion
 4. Run companion adapter tests that consume the protocol simulator behavior.
 5. Record parity results and any deltas before merge.
 
+## One-command workflow (recommended)
+
+Use:
+
+- `scripts/fcsp_companion_sync.sh`
+
+This performs, in order:
+
+1. submodule update/init for `external/python-imgui-esc-configurator`
+2. canonical FCSP simulator tests in this repo
+3. cocotb parser smoke in this repo
+4. focused FCSP-facing companion tests
+
+This keeps protocol ownership canonical while still validating companion consumption in one pass.
+
 ## Notes
 
 - Prefer importing protocol behavior through stable module APIs.

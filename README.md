@@ -36,5 +36,7 @@ Canonical spec:
 - `GITHUB_TODO.md` — active GitHub task list for this repository
 - `docs/FPGA_BLOCK_DESIGN.md` — FCSP FPGA block architecture and module boundaries
 - `docs/TOP_LEVEL_BLOCK_DIAGRAM.md` — quick-reference top-level FPGA datapath/control diagram
+- `docs/PYTHON_SUBMODULE_WORKFLOW.md` — companion Python-submodule workflow and FCSP sync pattern
+- `scripts/fcsp_companion_sync.sh` — one-command canonical+companion FCSP verification
 
 In short: MSP validates features quickly; FCSP is the long-term high-performance path.
