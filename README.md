@@ -15,6 +15,10 @@ This repo (`rt-fc-offloader`) and the Python repo are intended to be developed i
 Current project strategy:
 
 - **MSP path** is used first to validate GUI workflows, UX parity, and ESC feature behavior quickly.
-- **New protocol path** is the target runtime transport for deterministic FPGA-friendly framing/performance.
+- **FCSP path** is the target runtime transport for deterministic FPGA-friendly framing/performance.
 
-In short: MSP validates features quickly; the new protocol is the long-term high-performance path.
+Canonical spec:
+
+- `docs/FCSP_PROTOCOL.md` (**single source of truth; no duplicated copies in companion repos**)
+
+In short: MSP validates features quickly; FCSP is the long-term high-performance path.
