@@ -96,12 +96,14 @@ Mandatory verification rule:
 
 - Validate equivalent FCSP semantics over SPI (primary) and serial/sim transport (optional).
 - Confirm SERV 8-bit @ 50 MHz viability with RTL fast path ownership.
+- Enable SERV-originated `DEBUG_TRACE` frame egress over USB-UART for runtime observability.
 
 ## Exit criteria
 
 - Semantic parity holds across transport profiles.
 - No per-byte firmware bottleneck in nominal traffic.
 - Deterministic control latency and recovery behavior confirmed.
+- `DEBUG_TRACE` messages produced by SERV are observable on USB-UART and decode as valid FCSP frames.
 - Integration sign-off allowed only after all required block-level suites are green.
 
 ---

@@ -1,0 +1,28 @@
+# Project Rule: Pure Hardware FCSP Architecture
+## Mandate: DO NOT ADD A CPU
+
+This project implements a high-performance flight controller offloader specifically for the **Tang Nano 9K** and **Pico 2**. 
+
+### 1. Zero-Software Core
+- **No CPU**: The SERV RISC-V and its firmware have been REMOVED.
+- **RTL-Only**: All command parsing, CRC checks, and actuator drivers must remain in pure SystemVerilog RTL.
+- **Wishbone Native**: Use the hardware `fcsp_wishbone_master.sv` to translate FCSP `WRITE_BLOCK` / `READ_BLOCK` commands into register updates.
+
+### 2. Physical Pin Multiplexing (ESC Passthrough)
+- **The Switch**: The `fcsp_io_engines.sv` module contains a hardware mux controlled by register `0x20`.
+- **Break Signal**: Setting bit 4 of reg `0x20` forces the motor pins LOW. This is critical for entering the ESC bootloader.
+- **Determinism**: This transition is nanosecond-accurate. DO NOT route this through any software/firmware layers.
+
+### 3. Protocol & Timing
+- **FCSP/1**: All host communication uses the Flight Controller Serial Protocol.
+- **Clock**: Target frequency is **54 MHz** (verified on Tang Nano 9K).
+- **Big-Endian**: All protocol fields are Big-Endian on the wire.
+
+### 4. Hardware Map
+- `0x0000`: DShot Motors 0, 1
+- `0x0004`: DShot Motors 2, 3
+- `0x0010`: NeoPixel RGB
+- `0x0020`: Mode Register (Bit 0: Passthrough on/off; Bit 4: Force Low)
+
+---
+*Any AI agent opening this project must prioritize RTL-based solutions and strictly avoid introducing firmware/software dependencies inside the FPGA.*

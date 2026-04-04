@@ -1,62 +1,76 @@
-# Top-Level FPGA Block Diagram (FCSP Hot Path)
+# Top-Level FPGA Block Diagram (Pure Hardware FCSP)
 
-This is the quick-reference top-level view for the FCSP offloader architecture.
-
-Use this as the canonical top-level block diagram for FPGA datapath/control reviews.
-
-Related docs:
-
-- `docs/FPGA_BLOCK_DESIGN.md` (expanded architecture details)
-- `docs/assets/fpga_fcsp_lift_based_diagram.txt` (text-first diagram showing reusable/liftable legacy blocks)
-- `external/python-imgui-esc-configurator/docs/architecture.md` (historical/supporting context in submodule)
+This is the canonical architectural view for the **CPU-less** FCSP offloader. All functions are performed in high-speed RTL gates at 54 MHz.
 
 ```mermaid
-flowchart LR
-    SPI[SPI Front-End\nRX/TX Byte Stream] --> RXARB[RX Transport Arbiter]
-    USB[USB Serial Front-End\nCDC/UART Byte Stream] --> RXARB
-    RXARB --> PARSER[FCSP Parser\nSync + Header + Length]
-    PARSER --> CRC[CRC16/XMODEM Gate\nFrame Valid/Invalid]
-    CRC --> ROUTER[Channel Router]
+flowchart TD
+    %% Host Inputs
+    subgraph Host_Ingress [Unified Ingress]
+        SPI[SPI: Linux FC Link]
+        USB[USB-CDC: Configurator Link]
+        ARB{Ingress Arbiter}
+    end
 
-    ROUTER --> Q1[CONTROL FIFO]
-    ROUTER --> Q2[TELEMETRY FIFO]
-    ROUTER --> Q3[FC_LOG FIFO]
-    ROUTER --> Q4[DEBUG_TRACE FIFO]
-    ROUTER --> Q5[ESC_SERIAL FIFO]
+    %% Protocol Engine
+    subgraph Protocol_Engine [Packet Processing]
+        PARSER[FCSP Header Parser\nSync + Header + Length]
+        CRC[CRC16/XMODEM Gate\nFrame Valid/Invalid]
+        ROUTER{Channel Router}
+    end
 
-    Q1 --> SERV[SERV8 Control Plane\nOp Dispatch + Policy]
-    SERV --> TXMUX[TX Priority Mux]
+    %% Actuator Paths
+    subgraph Control_Plane [Actuation Plane - CH: 0x01]
+        WB_MASTER[Wishbone Master\nREAD/WRITE_BLOCK Executor]
+        WB_BUS[[Internal Wishbone Bus]]
+    end
 
-    Q2 --> TXMUX
-    Q3 --> TXMUX
-    Q4 --> TXMUX
-    Q5 --> TXMUX
+    subgraph Passthrough_Plane [ESC Passthrough - CH: 0x05]
+        ESC_TUNNEL[Serial Byte Tunnel\n1-Wire Half-Duplex]
+    end
 
-    TXMUX --> TXFR[FCSP TX Framer\nHeader + CRC16]
-    TXFR --> TXSEL[TX Transport Mux]
-    TXSEL --> SPI
-    TXSEL --> USB
+    %% Physical IO
+    subgraph Actuators [Physical Output Mux]
+        DSHOT[DShot Motor Engine]
+        NEO[NeoPixel Engine]
+        MUX_SWITCH{Hardware Pin Mux}
+    end
 
-    SERV --> IOSPACE[Block IO Windows\nPWM/DSHOT/LED/NEO]
-    SERV --> STATUS[Error + Link Counters]
-    STATUS --> TXMUX
+    %% Connections
+    SPI --> ARB
+    USB --> ARB
+    ARB --> PARSER --> CRC --> ROUTER
+
+    %% Routing
+    ROUTER -->|CONTROL| WB_MASTER
+    ROUTER -->|ESC_SERIAL| ESC_TUNNEL
+
+    %% Control Map
+    WB_MASTER <--> WB_BUS
+    WB_BUS <--> DSHOT
+    WB_BUS <--> NEO
+    
+    %% The Hard Switch (Reg 0x20)
+    WB_BUS -.->|Mode Select| MUX_SWITCH
+    ESC_TUNNEL <--> MUX_SWITCH
+
+    %% Physical World
+    MUX_SWITCH --> PHYSICAL_PINS[Motor ESC 1-4]
+    NEO --> PHYSICAL_LED[Status NeoPixels]
 ```
 
-## Key rule
+## Functional Principles
 
-- **Hot SPI path is RTL-only** (`Parser -> CRC -> Router -> FIFOs`).
-- **SERV is not in raw-byte path**; it handles validated CONTROL frames and policy.
-- **USB serial is optional alternate transport** and must converge to the same FCSP parser/router semantics.
+### 1) Deterministic Control
+Command execution (Channel `0x01`) is handled by a state machine that translates FCSP packets directly into Wishbone bus cycles. There is **no software jitter** or interrupt latency.
 
-## Lift-first text view
+### 2) Zero-Wait Passthrough
+When the `Mode Select` register is set, the motor pins are physically disconnected from the DShot engine and wired to the `ESC_SERIAL` stream. This provides the microsecond-level timing accuracy needed for ESC bootloader entry.
 
-If you want a review-friendly FPGA diagram with explicit `LIFT / ADAPT / NEW` tags, use:
+### 3) High-Speed Ingress
+Both SPI and USB-CDC flow into the same hardware parser. The **Ingress Arbiter** ensures that commands from either source are processed sequentially and safely.
 
-- `docs/assets/fpga_fcsp_lift_based_diagram.txt`
+## Related Documentation
 
-Reading tip: the text diagram is drawn as two clearly separated lanes (`SPI LANE` on the left, `USB SERIAL LANE` on the right) that merge only at `RX Transport Arbiter`.
-
-## Minimal interface boundary
-
-- RTL-to-SERV handoff happens at channel FIFOs using complete frame payload context.
-- SERV returns response payloads to TX path through `TX Priority Mux` + `TX Framer`.
+- `docs/FPGA_BLOCK_DESIGN.md`: Deep dive into block implementation.
+- `docs/FCSP_PROTOCOL.md`: Wire-format and register map details.
+- `docs/TIMING_REPORT.md`: Detailed switch-over timing analysis.

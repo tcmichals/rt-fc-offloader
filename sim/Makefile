@@ -19,6 +19,7 @@ FCSP_TOP_SOURCES := \
 	$(ROOT_DIR)/rtl/fcsp/fcsp_rx_fifo.sv \
 	$(ROOT_DIR)/rtl/fcsp/fcsp_serv_bridge.sv \
 	$(ROOT_DIR)/rtl/fcsp/fcsp_tx_fifo.sv \
+	$(ROOT_DIR)/rtl/fcsp/fcsp_tx_arbiter.sv \
 	$(ROOT_DIR)/rtl/fcsp/fcsp_tx_framer.sv \
 	$(ROOT_DIR)/rtl/fcsp/fcsp_io_engines.sv
 
@@ -28,11 +29,17 @@ WB_EXAMPLE_SOURCES := \
 AXIS_EXAMPLE_SOURCES := \
 	$(ROOT_DIR)/rtl/fcsp/examples/axis_frame_stage.sv
 
+TX_FIFO_SOURCES := \
+	$(ROOT_DIR)/rtl/fcsp/fcsp_tx_fifo.sv
+
+TX_ARBITER_SOURCES := \
+	$(ROOT_DIR)/rtl/fcsp/fcsp_tx_arbiter.sv
+
 export PYTHONPATH := $(SIM_DIR):$(SIM_DIR)/cocotb:$(PYTHONPATH)
 
 SIM ?= verilator
 
-.PHONY: test-cocotb test-python test-all test-top-cocotb test-wb-example-cocotb test-axis-example-cocotb test-fcsp-smoke-cocotb test-teaching-examples-cocotb fit-evidence-snapshot fit-evidence-snapshot-live
+.PHONY: test-cocotb test-python test-all test-top-cocotb test-wb-example-cocotb test-axis-example-cocotb test-tx-fifo-cocotb test-tx-arbiter-cocotb test-fcsp-smoke-cocotb test-teaching-examples-cocotb fit-evidence-snapshot fit-evidence-snapshot-live
 
 test-cocotb:
 	rm -rf sim_build results.xml
@@ -50,7 +57,15 @@ test-axis-example-cocotb:
 	rm -rf sim_build results.xml
 	$(MAKE) -C . sim TOPLEVEL=axis_frame_stage COCOTB_TEST_MODULES=test_axis_frame_stage_cocotb VERILOG_SOURCES="$(AXIS_EXAMPLE_SOURCES)"
 
-test-fcsp-smoke-cocotb: test-cocotb test-top-cocotb
+test-tx-fifo-cocotb:
+	rm -rf sim_build results.xml
+	$(MAKE) -C . sim TOPLEVEL=fcsp_tx_fifo COCOTB_TEST_MODULES=test_fcsp_tx_fifo_cocotb VERILOG_SOURCES="$(TX_FIFO_SOURCES)"
+
+test-tx-arbiter-cocotb:
+	rm -rf sim_build results.xml
+	$(MAKE) -C . sim TOPLEVEL=fcsp_tx_arbiter COCOTB_TEST_MODULES=test_fcsp_tx_arbiter_cocotb VERILOG_SOURCES="$(TX_ARBITER_SOURCES)" EXTRA_ARGS="-GARB_POLICY=1"
+
+test-fcsp-smoke-cocotb: test-cocotb test-top-cocotb test-tx-arbiter-cocotb
 
 test-teaching-examples-cocotb: test-wb-example-cocotb test-axis-example-cocotb
 

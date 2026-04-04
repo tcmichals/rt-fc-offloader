@@ -1,0 +1,28 @@
+# Cline / Roo-Code Instructions: Pure Hardware FCSP Offloader (Tang Nano 9K)
+
+## Design Summary: Zero-CPU Mandate
+
+This project implements a high-performance flight controller offloader specifically for the **Tang Nano 9K** and **Pico 2**. 
+
+### 1. Pure Hardware Path
+- **No CPU**: The SERV RISC-V and its firmware have been REMOVED.
+- **RTL-Only**: All command parsing, CRC checks, and actuator drivers must remain in pure SystemVerilog RTL.
+- **Wishbone Native**: Use the hardware `fcsp_wishbone_master.sv` to translate FCSP `WRITE_BLOCK` / `READ_BLOCK` commands into register updates.
+
+### 2. Hardware "Hard Switch" (ESC Passthrough)
+- **The Switch**: Use `0x20` register bit [0] to toggle between DShot (0) and Serial Passthrough (1).
+- **The Break Signal**: Set bit [4] to force motor pins LOW (required for ESC bootloader entry).
+
+### 3. Protocol Alignment
+- **FCSP/1**: All host communication uses the Flight Controller Serial Protocol.
+- **Clock**: Target frequency is **54 MHz** (verified on Tang Nano 9K).
+- **Endianness**: Big-Endian on wire.
+
+### 4. Register Addresses
+- `0x0000`: DShot Motors 0, 1
+- `0x0004`: DShot Motors 2, 3
+- `0x0010`: NeoPixel RGB Status
+- `0x0020`: Mode Register (Bit 0: Passthrough on/off; Bit 4: Force Low)
+
+---
+*ALWAYS prioritize RTL-based solutions and strictly avoid introducing firmware/software dependencies inside the FPGA.*

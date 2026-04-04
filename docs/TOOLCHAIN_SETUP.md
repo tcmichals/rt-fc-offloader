@@ -1,98 +1,77 @@
-# Toolchain Setup Guide (Linux)
+# Toolchain Setup Guide (Linux + Windows Git Bash)
 
-This guide explains how to install and configure the toolchains used by `rt-fc-offloader`:
+This guide explains how to install and configure the toolchains used for the Pure Hardware FCSP Offloader:
 
-- OSS FPGA tools (`yosys`, `nextpnr-himbaechel`, `gowin_pack`, `openFPGALoader`)
-- Arm GNU Toolchain (`arm-none-eabi-gcc`)
-- RISC-V GNU Toolchain (`riscv64-unknown-elf-gcc`)
+- **OSS FPGA tools**: `yosys`, `nextpnr-himbaechel`, `gowin_pack`, `openFPGALoader`.
+- **Arm GNU Toolchain**: `arm-none-eabi-gcc` (for Pico 2 firmware).
+- **Raspberry Pi Pico SDK**: `pico_sdk_init.cmake`.
 
-## Recommended directory layout
+> **Note**: A RISC-V toolchain is **no longer required**, as the offloader now uses a pure hardware architecture without an internal CPU.
 
-Use a consistent tools directory:
+---
 
-- `~/.tools/oss-cad-suite/bin`
-- `~/.tools/gcc-arm-none-eabi/bin`
-- `~/.tools/riscv/bin`
+## 1) Install OSS CAD Suite (FPGA Synthesis)
 
-## 1) Install OSS CAD Suite
+The OSS CAD Suite provides the open-source flow for the Tang Nano 9K.
 
-1. Create tools directory:
-   - `mkdir -p ~/.tools`
-2. Download the latest Linux x64 archive from:
-   - `https://github.com/YosysHQ/oss-cad-suite-build/releases`
-3. Extract under `~/.tools` and ensure resulting path is:
-   - `~/.tools/oss-cad-suite/bin`
+1. **Download**: Get the latest Linux x64 archive from [YosysHQ/oss-cad-suite-build](https://github.com/YosysHQ/oss-cad-suite-build/releases).
+2. **Extract**: Extract to `~/.tools/oss-cad-suite`.
+3. **Python Deps**: The bitstream packer requires some Python libraries. Install them into the OSS suite's internal Python:
+   ```sh
+   ~/.tools/oss-cad-suite/py3bin/python3 -m pip install numpy msgspec fastcrc
+   ```
 
-## 2) Install Arm GCC
+## 2) Install Arm GCC (Pico 2 Firmware)
 
-### Option A: distribution package
+Required for compiling the flight controller code that talks to the FPGA.
 
-- Ubuntu/Debian:
-  - `sudo apt-get update`
-  - `sudo apt-get install -y gcc-arm-none-eabi`
+1. **Download**: Download the "Arm GNU Toolchain" from [Arm Developer](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads).
+2. **Extract**: Extract to `~/.tools/gcc-arm-none-eabi`.
 
-### Option B: Arm GNU Toolchain release archive
+## 3) Install Pico SDK
 
-1. Download a Linux x86_64 Arm GNU Toolchain release.
-2. Extract to:
-   - `~/.tools/gcc-arm-none-eabi`
-3. Ensure compiler binary is available at:
-   - `~/.tools/gcc-arm-none-eabi/bin/arm-none-eabi-gcc`
+1. **Clone**:
+   ```sh
+   git clone --recurse-submodules --depth=1 \
+     https://github.com/raspberrypi/pico-sdk.git \
+     ~/.tools/pico-sdk
+   ```
+2. **Set Variable**: Ensure `PICO_SDK_PATH` points to this directory.
 
-## 3) Install RISC-V GCC
+---
 
-### Option A: distribution package
+## 4) Configure Environment
 
-- Ubuntu/Debian:
-  - `sudo apt-get update`
-  - `sudo apt-get install -y gcc-riscv64-unknown-elf`
+From the repository root, source the settings script to add the tools to your path:
 
-### Option B: prebuilt toolchain archive
+```sh
+source settings.sh
+```
 
-1. Download a prebuilt RISC-V GNU toolchain archive.
-2. Extract to:
-   - `~/.tools/riscv`
-3. Ensure compiler binary is available at:
-   - `~/.tools/riscv/bin/riscv64-unknown-elf-gcc`
-
-## 4) Configure environment for this repository
-
-From repository root:
-
-- `source settings.sh`
-
-`settings.sh` configures:
-
+`settings.sh` will automatically detect tools in `~/.tools` and configure:
 - `RT_FC_OFFLOADER_ROOT`
 - `OSS_TOOLS_BIN`
 - `ARM_GCC_BIN`
-- `RISCV_GCC_BIN`
+- `PICO_SDK_PATH`
 
-and prepends any detected toolchain `bin` directories to `PATH`.
+## 5) Verify Installation
 
-### Optional explicit overrides
-
-Set these before sourcing if your install paths differ:
-
-- `export OSS_TOOLS_BIN=/your/path/oss-cad-suite/bin`
-- `export ARM_GCC_BIN=/your/path/arm/bin`
-- `export RISCV_GCC_BIN=/your/path/riscv/bin`
-- `source settings.sh`
-
-## 5) Verify installation
-
+Run these commands to ensure the tools are ready:
 - `command -v yosys`
 - `command -v nextpnr-himbaechel`
 - `command -v gowin_pack`
-- `command -v openFPGALoader`
 - `command -v arm-none-eabi-gcc`
-- `command -v riscv64-unknown-elf-gcc`
 
-## 6) Build Tang Nano 9K bitstream
+## 6) Build the Bitstream
 
-- `cmake -S . -B build/cmake`
-- `cmake --build build/cmake --target tang9k-build`
+The build is managed via CMake. You don't need to manually run any synthesis scripts.
 
-Expected artifact:
+```sh
+# Configure
+cmake -S . -B build/cmake
 
-- `build/tang9k_oss/hardware.fs`
+# Build Tang Nano 9K target
+cmake --build build/cmake --target tang9k-build
+```
+
+**Resulting Artifact**: `build/tang9k_oss/hardware.fs`

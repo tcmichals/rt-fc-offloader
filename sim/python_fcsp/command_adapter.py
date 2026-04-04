@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 from .fcsp_codec import Channel, ControlOp, build_control_payload, encode_frame
 
@@ -13,6 +14,10 @@ class LegacyIntent(str, Enum):
     SET_MOTOR_SPEED = "set_motor_speed"
     GET_LINK_STATUS = "get_link_status"
     PING = "ping"
+    READ_BLOCK = "read_block"
+    WRITE_BLOCK = "write_block"
+    GET_CAPS = "get_caps"
+    HELLO = "hello"
 
 
 @dataclass(frozen=True)
@@ -22,7 +27,7 @@ class FcspCommand:
     payload: bytes
 
 
-def build_fcsp_command(intent: LegacyIntent, **kwargs: int) -> FcspCommand:
+def build_fcsp_command(intent: LegacyIntent, **kwargs: Any) -> FcspCommand:
     if intent == LegacyIntent.PASSTHROUGH_ENTER:
         motor_index = int(kwargs["motor_index"]) & 0xFF
         data = bytes([motor_index])
@@ -53,6 +58,54 @@ def build_fcsp_command(intent: LegacyIntent, **kwargs: int) -> FcspCommand:
             raise ValueError("nonce out of range")
         data = nonce.to_bytes(4, "big")
         return FcspCommand(int(Channel.CONTROL), int(ControlOp.PING), data)
+
+    if intent == LegacyIntent.READ_BLOCK:
+        space = int(kwargs["space"])
+        address = int(kwargs["address"])
+        length = int(kwargs["length"])
+        if not (0 <= space <= 0xFF):
+            raise ValueError("space out of range")
+        if not (0 <= address <= 0xFFFFFFFF):
+            raise ValueError("address out of range")
+        if not (0 <= length <= 0xFFFF):
+            raise ValueError("length out of range")
+        data = bytes([space]) + address.to_bytes(4, "big") + length.to_bytes(2, "big")
+        return FcspCommand(int(Channel.CONTROL), int(ControlOp.READ_BLOCK), data)
+
+    if intent == LegacyIntent.WRITE_BLOCK:
+        space = int(kwargs["space"])
+        address = int(kwargs["address"])
+        write_data = bytes(kwargs["data"])
+        if not (0 <= space <= 0xFF):
+            raise ValueError("space out of range")
+        if not (0 <= address <= 0xFFFFFFFF):
+            raise ValueError("address out of range")
+        if len(write_data) > 0xFFFF:
+            raise ValueError("data too long")
+        data = (
+            bytes([space])
+            + address.to_bytes(4, "big")
+            + len(write_data).to_bytes(2, "big")
+            + write_data
+        )
+        return FcspCommand(int(Channel.CONTROL), int(ControlOp.WRITE_BLOCK), data)
+
+    if intent == LegacyIntent.GET_CAPS:
+        page = int(kwargs.get("page", 0))
+        max_len = int(kwargs.get("max_len", 0))
+        if not (0 <= page <= 0xFF):
+            raise ValueError("page out of range")
+        if not (0 <= max_len <= 0xFFFF):
+            raise ValueError("max_len out of range")
+        data = bytes([page]) + max_len.to_bytes(2, "big")
+        return FcspCommand(int(Channel.CONTROL), int(ControlOp.GET_CAPS), data)
+
+    if intent == LegacyIntent.HELLO:
+        hello_tlv = bytes(kwargs.get("hello_tlv", b""))
+        if len(hello_tlv) > 0xFFFF:
+            raise ValueError("hello_tlv too large")
+        data = len(hello_tlv).to_bytes(2, "big") + hello_tlv
+        return FcspCommand(int(Channel.CONTROL), int(ControlOp.HELLO), data)
 
     raise ValueError(f"unsupported intent: {intent}")
 

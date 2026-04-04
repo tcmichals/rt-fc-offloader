@@ -1,4 +1,4 @@
-create_clock -name i_clk -period 37.037 [get_ports {i_clk}]
+create_clock -name i_clk -period 20.000 [get_ports {i_clk}]
 
 # External SPI clock domain comes from host and is treated as asynchronous to
 # i_clk in this initial board wrapper.
