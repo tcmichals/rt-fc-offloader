@@ -2,6 +2,21 @@
 
 Real-time flight-controller offloader repository for FPGA/RTL-centered transport, framing, and deterministic I/O paths.
 
+## Quick start (setup + build)
+
+- Toolchain install/download/extract guide:
+	- `docs/TOOLCHAIN_SETUP.md`
+- Tang Nano 9K build/program guide:
+	- `docs/TANG9K_PROGRAMMING.md`
+- Environment setup script:
+	- `settings.sh`
+
+Minimal bring-up from repository root:
+
+- `source settings.sh`
+- `cmake -S . -B build/cmake`
+- `cmake --build build/cmake --target tang9k-build`
+
 ## What this project is
 
 `rt-fc-offloader` is the hardware/RTL side of an offload architecture for flight stacks such as **INAV** and **Betaflight**.
@@ -122,6 +137,11 @@ Then use CMake targets directly:
 - `cmake --build build/cmake --target tang9k-build`
 
 This keeps toolchain path setup consistent and explicit per shell session.
+
+Additional references:
+
+- Full toolchain setup: `docs/TOOLCHAIN_SETUP.md`
+- Tang9K programming flow: `docs/TANG9K_PROGRAMMING.md`
 
 ## FPGA sizing constraint (explicit)
 
