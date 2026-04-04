@@ -4,7 +4,7 @@ This plan turns the protocol requirements into immediate implementation steps.
 
 ## Objective
 
-- Validate **MSP baseline on PICO + ESC-config GUI** first.
+- Validate the **FCSP runtime path on FPGA** first (no Pico dependency).
 - Implement **FCSP runtime path on FPGA** with **SERV 8-bit @ 50 MHz** target.
 - Advance to the next FCSP test stage only after parity and timing gates are met.
 - Run two synchronized benches: RTL (Verilator/cocotb) and Python FCSP protocol simulator.
@@ -14,18 +14,18 @@ Mandatory verification rule:
 - Break the design into independently testable blocks.
 - Every block must pass block-level tests before entering subsystem/integration validation.
 
-## Phase 0 — Baseline lock (MSP/PICO)
+## Phase 0 — FCSP baseline lock (FPGA-native)
 
 ## Exit criteria
 
-- GUI workflows pass over standard MSP path.
-- Passthrough enter/exit/scan behavior verified.
-- ESC settings read/write and representative flash workflow verified.
-- Baseline behavior captured for FCSP parity comparison.
+- FCSP parser/router/CRC path is green in block-level simulation.
+- CONTROL minimum ops (`PING`, `HELLO`, `GET_CAPS`, `GET_LINK_STATUS`) are deterministic.
+- Top-level CONTROL lane smoke tests pass end-to-end.
+- Baseline behavior snapshot captured for subsequent FCSP regressions.
 
 ## Artifacts
 
-- Baseline test notes: `sim/baseline_msp_results.md` (to be created during execution)
+- Baseline test notes: `sim/baseline_fcsp_results.md` (to be created during execution)
 
 ---
 
@@ -64,7 +64,7 @@ Mandatory verification rule:
 
 ## Exit criteria
 
-- State transitions match MSP baseline semantics.
+- State transitions match documented FCSP control semantics.
 - Result/error code mapping deterministic and documented.
 - Block-level tests pass for CONTROL dispatcher and passthrough state machine behavior.
 - Python simulator op/result mapping tests pass for CONTROL ops in scope.
@@ -112,13 +112,18 @@ Mandatory verification rule:
 2. Implement firmware CONTROL dispatcher skeleton (`firmware/serv8/`).
 3. Build RTL simulation tests for parser resync + caps paging (`sim/`).
 4. Build Python FCSP simulator tests for frame/op/result behavior (`sim/python_fcsp/`).
-5. Run MSP baseline checklist and freeze expected behavior snapshots.
+5. Freeze FCSP baseline behavior snapshots and wire into regression checks.
+
+## Legacy note (optional)
+
+- Pico/MSP bring-up remains useful as historical reference and ecosystem parity context.
+- It is not a required gate for FCSP/Tang9K implementation progress in this repository.
 
 ## Done definition for “FCSP next test”
 
 Proceed only when:
 
-1. MSP baseline checklist is complete.
+1. FCSP Phase 0 baseline checklist is complete.
 2. FCSP Phase 1–3 gates pass in simulation.
 3. 50 MHz target constraints are met for control-plane profile.
 4. Parity deltas (if any) are documented with owners and closure plan.

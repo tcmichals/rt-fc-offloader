@@ -32,8 +32,21 @@ This folder owns FCSP byte-stream fast-path logic.
 		- SPI frontend path
 		- optional USB serial ingress/egress path
 	- includes parser observability, SERV bridge hookup, IO engine wrapper hookup
+- `fcsp_router.sv`
+	- AXIS-style channel router skeleton
+	- demuxes payload stream into CONTROL / TELEMETRY / FC_LOG / DEBUG_TRACE / ESC_SERIAL
+- `fcsp_rx_fifo.sv` / `fcsp_tx_fifo.sv`
+	- AXIS-style FIFO wrapper skeletons
+	- preserve payload + metadata sideband contract while real buffering is brought in
 
 These are compile-safe skeletons intended to accelerate integration while legacy blocks are brought over.
+
+## Internal stream convention
+
+- Prefer **AXIS-style naming internally**: `tvalid/tready/tdata/tlast`
+- Use `s_*` for slave/input stream endpoints
+- Use `m_*` for master/output stream endpoints
+- See `rtl/fcsp/INTERFACES.md`
 
 ## Verification goals
 

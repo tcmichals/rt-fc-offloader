@@ -9,10 +9,10 @@ This is the shared offloader↔flight-controller protocol for both repositories:
 
 ## Purpose
 
-FCSP replaces MSP for high-rate runtime traffic while preserving MSP-compatible workflows during migration.
+FCSP is the canonical runtime protocol for this repository.
 
-- MSP path: feature validation, compatibility, and bring-up
-- FCSP path: deterministic runtime transport and lower CPU overhead
+- FCSP path: deterministic runtime transport with lower control-plane CPU overhead
+- MSP/Pico path: optional migration/compatibility context only (not required for implementation progress)
 
 ## Layering model (protocol vs physical layer)
 
@@ -36,6 +36,7 @@ Rule: changing physical layer must not change FCSP behavior semantics.
 - Clock target: **50 MHz FMAX**
 - Transport profile: SPI byte stream on the **offloader↔flight-controller** link (no packet boundary assumptions)
 - Parse model: RTL fast-path + lightweight control-plane firmware
+- FPGA target philosophy: **small-FPGA-first** (Tang9K-class viability, no large-device assumption)
 
 ## Streaming model (not send-and-wait)
 

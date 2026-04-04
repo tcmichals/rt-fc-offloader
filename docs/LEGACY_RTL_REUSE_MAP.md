@@ -69,6 +69,22 @@ Reuse intent:
 - optional for internal register windows / buffering
 - avoid dragging full legacy SoC topology unless needed
 
+Recommended use in this project:
+
+- Prefer **Wishbone** for device/register attachment points that sit beside the
+	FCSP stream fabric.
+- Good candidates are IO windows, control/status peripherals, and optional
+	CPU-facing peripheral maps.
+- Do **not** force Wishbone into the FCSP byte-stream hot path; keep AXIS-style
+	stream seams there.
+
+Teaching / reuse value:
+
+- engineers can learn a standard lightweight device bus
+- legacy Wishbone peripherals can be wrapped and reused with less effort
+- nearby target designs can retarget device blocks while preserving the same
+	FCSP stream pipeline
+
 ## What not to port as-is
 
 - MSP-specific framers/parsers
@@ -103,3 +119,8 @@ Start with SPI + CRC wrappers and a cocotb smoke test that proves:
 - split bursts accepted
 - sync/length gating works
 - CRC pass/fail classification works
+
+Longer-term reuse rule:
+
+- for stream datapaths, keep AXIS-style seams
+- for device/register blocks, prefer Wishbone wrappers and per-device unit tests

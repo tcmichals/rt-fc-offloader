@@ -84,12 +84,19 @@ flowchart LR
   - DEBUG_TRACE (`0x04`)
   - ESC_SERIAL (`0x05`)
 - Handles FIFO-full backpressure/drop policy (deterministic + counted).
+- Internal implementation direction is AXIS-style:
+  - one packetized input stream + frame metadata
+  - per-channel AXIS-like output streams
+  - ready/valid backpressure from the selected channel sink
 
 ### 5) Channel FIFOs (`fcsp_rx_fifo_*`, `fcsp_tx_fifo_*`)
 
 - Isolate producer/consumer timing.
 - Carry frame boundaries (`sof/eof` or length-tagged packets).
 - Target aggregate depth >= 4 KB equivalent across RX/TX queues.
+- Internal wrapper direction is AXIS-style payload stream plus metadata sideband:
+  - payload: `tvalid`, `tready`, `tdata[7:0]`, `tlast`
+  - metadata: `channel`, `flags`, `seq`, `payload_len`
 
 ### 6) `serv_control_dispatch` (firmware)
 
@@ -131,21 +138,23 @@ DSHOT mode compatibility requirement:
 
 ## Internal interfaces (recommended)
 
-Use a simple valid/ready stream for bytes and a packetized stream for frames.
+Use AXIS-style valid/ready streams internally for bytes and packetized frame payloads.
 
 ### Byte-stream interface
 
-- `rx_byte[7:0]`
-- `rx_valid`, `rx_ready`
+- `tdata[7:0]`
+- `tvalid`, `tready`
+- optional `tlast` when packet boundaries are already known
 
 ### Frame-stream interface
 
-- `frm_valid`, `frm_ready`
-- `frm_channel[7:0]`
-- `frm_flags[7:0]`
-- `frm_seq[15:0]`
-- `frm_len[15:0]`
-- `frm_data[7:0]` + `frm_data_valid` + `frm_data_last`
+- payload path: `tvalid`, `tready`, `tdata[7:0]`, `tlast`
+- sideband metadata: `channel[7:0]`, `flags[7:0]`, `seq[15:0]`, `payload_len[15:0]`
+
+Recommended naming style:
+
+- `s_*` = slave/input side of a stream
+- `m_*` = master/output side of a stream
 
 ### Status/counter interface
 

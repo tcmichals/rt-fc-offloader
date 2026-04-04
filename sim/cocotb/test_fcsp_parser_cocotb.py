@@ -11,6 +11,7 @@ async def _reset(dut) -> None:
     dut.rst_n.value = 0
     dut.in_valid.value = 0
     dut.in_byte.value = 0
+    dut.m_frame_tready.value = 1
     await RisingEdge(dut.clk)
     await RisingEdge(dut.clk)
     dut.rst_n.value = 1

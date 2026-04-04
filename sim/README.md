@@ -24,7 +24,7 @@ Two complementary benches are required:
 ## Expected outputs
 
 - pass/fail logs for each test group
-- behavior snapshots for MSP baseline parity checks
+- behavior snapshots for FCSP baseline regression checks
 - clear defect reproduction notes for protocol regressions
 - per-block pass reports (parser, CRC, router, FIFO, control dispatcher, block-IO)
 
@@ -42,3 +42,30 @@ Two complementary benches are required:
 2. Run Python protocol simulator tests.
 3. Run cocotb/Verilator tests.
 4. Keep both suites green before integration sign-off.
+
+## Quickstart commands
+
+From repo root:
+
+1. Ensure venv tools are on `PATH` (for `cocotb-config`):
+	- `PATH="$(pwd)/.venv/bin:$PATH"`
+2. Run protocol simulator tests:
+	- `make -C sim test-python`
+3. Run parser block cocotb tests:
+	- `make -C sim test-cocotb`
+4. Run top-level cocotb smoke tests:
+	- `make -C sim test-top-cocotb`
+5. Run teaching micro-references:
+	- `make -C sim test-wb-example-cocotb`
+	- `make -C sim test-axis-example-cocotb`
+
+Convenience aggregate targets:
+
+- FCSP smoke suite:
+	- `make -C sim test-fcsp-smoke-cocotb`
+- Teaching micro-reference suite:
+	- `make -C sim test-teaching-examples-cocotb`
+- Full local regression:
+	- `make -C sim test-all`
+- Generate fit-evidence snapshot template:
+	- `make -C sim fit-evidence-snapshot`

@@ -31,6 +31,8 @@ Do not create duplicate FCSP spec files in companion repos.
 3. Preserve passthrough safety ownership (no DSHOT writes while passthrough active).
 4. Prefer small fixed payloads + TLV extension records for discoverability.
 5. Use HELLO + GET_CAPS for discovery; mDNS is optional for IP-exposed links only.
+6. FPGA RTL implementation language is SystemVerilog only.
+7. Testbench/simulation stack is Verilator + cocotb.
 
 ## Suggested prompt snippet
 
