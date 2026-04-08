@@ -4,8 +4,12 @@ This document defines the FCSP/1 offloader architecture and block responsibiliti
 
 ## Implementation Status
 
-- Current top-level integration (`fcsp_offloader_top.sv`) uses `fcsp_serv_bridge` as the active control-plane seam.
-- `fcsp_wishbone_master.sv` exists and remains the direct-control target path, but is not the active top-level integration path in this revision.
+- **Active control-plane handler:** `fcsp_wishbone_master` in `fcsp_offloader_top.sv`.
+- **Channel 0x05 (ESC_SERIAL):** Full TX/RX path wired through `fcsp_io_engines` → `wb_esc_uart` → `fcsp_stream_packetizer`.
+- **SPI TX egress:** Disabled. All responses exit via USB-UART.
+- `fcsp_serv_bridge` is legacy dead code — no longer instantiated.
+
+> **Complete implementation status and gap tracking:** [DESIGN.md](DESIGN.md) §12
 
 ## Design Goals
 
@@ -30,11 +34,11 @@ flowchart LR
     CRC --> ROUTER[fcsp_router\nChannel Router]
 
     %% Channels
-    ROUTER -->|CH 0x01| SERV_BRIDGE[fcsp_serv_bridge\nControl Plane Seam]
+    ROUTER -->|CH 0x01| WB_MASTER[fcsp_wishbone_master\nControl Plane]
     ROUTER -->|CH 0x05| BYPASS[ESC Serial Bridge\nBypass Plane]
 
     %% Logic
-    SERV_BRIDGE -.serv cmd/rsp.-> BUS[Wishbone Internal Bus]
+    WB_MASTER -.WB bus.-> BUS[Wishbone Internal Bus]
     BUS <--> DSHOT[DShot Motor Engine]
     BUS <--> NEO[NeoPixel Engine]
     
@@ -65,14 +69,13 @@ flowchart LR
   - **Channel 0x01 (CONTROL)**: Routed to the Wishbone Master.
   - **Channel 0x05 (ESC_SERIAL)**: Routed to the physical pin switch.
 
-### 4) Control Plane Handler
-- **Current**: `fcsp_serv_bridge` is integrated in top-level and carries FCSP control payloads to/from SERV stream interfaces.
-- **Target**: `fcsp_wishbone_master` path for direct `WRITE_BLOCK` / `READ_BLOCK` execution.
+### 4) Control Plane Handler\n- `fcsp_wishbone_master` directly executes `WRITE_BLOCK` / `READ_BLOCK` ops on the Wishbone bus.
 
 ### 5) `fcsp_io_engines`
-- Implements the registers for DShot speeds, NeoPixel colors, and the **Hardware Switch**.
-- **Reg 0x00 / 0x04**: DShot motor words.
-- **Reg 0x20**: Mode Control (The Switch). Controls the physical `PIN_MUX`.
+- Implements the registers for DShot speeds, NeoPixel colors, ESC UART, PWM decoder, and the **Hardware Pin Mux**.
+- Address decode is handled by `wb_io_bus` using `wbm_adr_i[15:8]` as page select.
+
+See `docs/DESIGN.md` §3–4 for the complete address map and per-peripheral register maps.
 
 ---
 
@@ -91,14 +94,19 @@ Unlike previous designs where a CPU copied bytes between UARTs, this design uses
 
 Access via FCSP Channel `0x01` (`WRITE_BLOCK` / `READ_BLOCK`).
 
-Addressing note: this table uses **relative offsets**. Some docs show absolute bus addresses (`0x4000xxxx`) for the same registers.
+> **Canonical register map:** [DESIGN.md](DESIGN.md) §4–5 — complete address map and per-peripheral register definitions.
 
-| Address | Register | Description |
-|---------|----------|-------------|
-| 0x0000  | DShot 0-1 | High-resolution motor speed words for Motors 0 & 1 |
-| 0x0004  | DShot 2-3 | High-resolution motor speed words for Motors 2 & 3 |
-| 0x0010  | NeoPixel | 24-bit RGB value for status LEDs |
-| 0x0020  | Mode Select | **The Switch**: bit[0]=Mode, bit[2:1]=Channel, bit[4]=Force Low |
+**Key page addresses (quick reference):**
+
+| Page `[15:8]` | Peripheral |
+|---------------|------------|
+| `0x00` | WHO_AM_I (`0xFC500002`) |
+| `0x01` | PWM Decoder (6-ch) |
+| `0x03` | DShot Controller (4-ch) |
+| `0x04` | Serial/DShot Mux |
+| `0x06` | NeoPixel (8-pixel) |
+| `0x09` | ESC UART (half-duplex) |
+| `0x0C` | LED Controller |
 
 ---
 

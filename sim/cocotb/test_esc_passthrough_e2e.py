@@ -109,3 +109,32 @@ async def test_msp_bypass_handles_multiple_serial_messages(dut) -> None:
 
     assert saw_any_esc_route, "Expected ESC routing activity for multi-message stream"
     assert not saw_control_cmd, "ESC_SERIAL multi-message stream must not leak into control command path"
+
+
+@cocotb.test()
+async def test_esc_serial_ch05_reaches_uart_tx(dut) -> None:
+    """Verify CH 0x05 payload bytes flow through to ESC UART TX (o_esc_tx_active fires).
+
+    This proves the complete ingress path: USB → parser → CRC gate → router →
+    io_engines stream TX → wb_esc_uart TX FSM.
+    """
+    cocotb.start_soon(Clock(dut.clk, 18.5, unit="ns").start())
+    await _reset(dut)
+
+    # Send a single-byte ESC_SERIAL frame.
+    payload = b"\x55"
+    frame = encode_frame(flags=0, channel=Channel.ESC_SERIAL, seq=42, payload=payload)
+
+    await _send_usb_stream(dut, frame)
+
+    # Wait for o_esc_tx_active to go high — proves bytes reached ESC UART.
+    saw_tx_active = False
+    for _ in range(5000):
+        await RisingEdge(dut.clk)
+        await ReadOnly()
+        if bool(dut.o_esc_tx_active.value):
+            saw_tx_active = True
+            break
+        await NextTimeStep()
+
+    assert saw_tx_active, "Expected o_esc_tx_active to fire after CH 0x05 frame"

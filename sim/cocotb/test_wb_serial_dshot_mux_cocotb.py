@@ -251,3 +251,71 @@ async def test_watchdog_timeout_and_activity_reset(dut):
         await RisingEdge(dut.clk)
 
     assert int(dut.mux_sel.value) == 1, "Watchdog timeout should revert auto-passthrough to DShot mode"
+
+
+@cocotb.test()
+async def test_dshot_to_serial_transition(dut):
+    """Switch from DShot to serial mode: target pin should go idle-high (serial TX)."""
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await _reset(dut)
+
+    # Default is DShot mode. Drive DShot pattern on all channels.
+    dut.dshot_in.value = 0b1010  # ch3=1, ch2=0, ch1=1, ch0=0
+    dut.serial_tx_i.value = 1  # serial idle-high
+    dut.serial_oe_i.value = 1
+    for _ in range(4):
+        await RisingEdge(dut.clk)
+
+    # Confirm DShot drives pads — binstr is [3][2][1][0] (MSB first)
+    pads = str(dut.pad_motor.value)
+    assert pads[0] == '1', f"DShot ch3 should be 1, got pad={pads}"
+    assert pads[3] == '0', f"DShot ch0 should be 0, got pad={pads}"
+
+    # Switch to serial mode targeting channel 0 — serial_tx_i is 1 (idle-high)
+    await _wb_write(dut, (0 << 0) | (0 << 1))
+
+    # Allow register + tristate settling (1 cycle tristate + pipeline)
+    for _ in range(6):
+        await RisingEdge(dut.clk)
+
+    pads = str(dut.pad_motor.value)
+    # Target channel 0 (index 3 in [3][2][1][0]) should reflect serial TX (high)
+    assert pads[3] == '1', f"Target ch0 should be serial idle-high after switch, got pad={pads}"
+    # Non-target channels should be high-Z (Verilator resolves z as 0)
+    assert pads[0] != '1', f"Non-target ch3 should not be driven high in serial mode, got pad={pads}"
+
+
+@cocotb.test()
+async def test_force_low_break_hold_and_release(dut):
+    """Assert force_low for a prolonged period, release, verify pin LOW then HIGH."""
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await _reset(dut)
+
+    dut.serial_tx_i.value = 1
+    dut.serial_oe_i.value = 1
+    dut.dshot_in.value = 0b0000
+
+    # Serial mode, channel 0, force_low=1
+    await _wb_write(dut, (0 << 0) | (0 << 1) | (1 << 4))
+    for _ in range(4):
+        await RisingEdge(dut.clk)
+
+    # Verify pin is LOW
+    pads = str(dut.pad_motor.value)
+    assert pads[3] == '0', f"Channel 0 should be forced LOW, got pad={pads}"
+
+    # Hold force_low for a simulated "long" break (200 cycles ≈ 20us at 100MHz sim clock)
+    for _ in range(200):
+        await RisingEdge(dut.clk)
+
+    # Confirm still LOW
+    pads = str(dut.pad_motor.value)
+    assert pads[3] == '0', f"Channel 0 should stay forced LOW during break, got pad={pads}"
+
+    # Release force_low, keep serial mode with serial_tx high
+    await _wb_write(dut, (0 << 0) | (0 << 1) | (0 << 4))
+    for _ in range(6):
+        await RisingEdge(dut.clk)
+
+    pads = str(dut.pad_motor.value)
+    assert pads[3] == '1', f"Channel 0 should return to serial HIGH after release, got pad={pads}"

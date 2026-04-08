@@ -50,15 +50,35 @@ Equivalent CMake-oriented flow:
 
 ## Suite-to-coverage mapping
 
-| Suite | CMake target | Underlying make target | Primary intent |
-|---|---|---|---|
-| Python FCSP model | `sim-test-python` | `test-python` | Protocol semantics and regression safety in Python model |
-| Parser cocotb | `sim-test-cocotb` | `test-cocotb` | Frame sync/resync, header parsing, payload length guardrails |
-| Top-level cocotb | `sim-test-top-cocotb` | `test-top-cocotb` | CONTROL routing, control-response pathing, CRC drop behavior |
-| Experimental top E2E | `sim-test-top-cocotb-experimental` | `test-top-cocotb-experimental` | ESC passthrough/E2E behavior under top-level integration |
-| Teaching examples | `sim-test-teaching-examples` | `test-teaching-examples-cocotb` | Wishbone/AXIS reference patterns and educational examples |
-| Full local regression | `sim-test-all` | `test-all` | Python + smoke cocotb + teaching examples |
-| Strict local regression | `sim-test-all-strict` | `test-all-strict` | Full regression plus top-level/experimental/serial-mux integration |
+| Suite | Makefile target | DUT | Tests | Primary intent |
+|-------|----------------|-----|-------|----------------|
+| Python FCSP model | `test-python` | N/A | 26 | Protocol codec, command adapter, HW script sim |
+| Parser cocotb | `test-cocotb` | `fcsp_parser` | Various | Frame sync/resync, header parsing, payload length guardrails |
+| Top-level cocotb | `test-top-cocotb` | `fcsp_offloader_top` | 6 | CONTROL routing, control-response pathing, CRC drop, channel isolation |
+| Experimental top E2E | `test-top-cocotb-experimental` | `fcsp_offloader_top` | 2 | ESC passthrough routing, MSP bypass multi-message |
+| TX FIFO | `test-tx-fifo-cocotb` | `fcsp_tx_fifo` | Various | FIFO buffering, metadata pass-through |
+| TX Arbiter | `test-tx-arbiter-cocotb` | `fcsp_tx_arbiter` | Various | Priority arbitration (CTRL > ESC > DBG) |
+| Serial Mux | `test-serial-mux-cocotb` | `wb_serial_dshot_mux` | 8 | DShot/serial mode, force-low, MSP sniffer, watchdog |
+| LED Controller | `test-wb-led-cocotb` | `wb_led_controller` | Various | SET/CLEAR/TOGGLE register behavior |
+| WB Master | `test-fcsp-wb-master-cocotb` | `fcsp_wishbone_master` | Various | READ/WRITE_BLOCK op decode, WB cycle generation |
+| IO Bus | `test-wb-io-bus-cocotb` | `wb_io_bus` | 7 | Address decode, WHO_AM_I, all slave select, unmapped safety |
+| DShot Output | `test-dshot-out-cocotb` | `dshot_out` | 4 | Pulse timing (DSHOT150/300/600), 64-bit param safety |
+| NeoPixel | `test-wb-neopx-cocotb` | `wb_neoPx` | 4 | Pixel write, trigger, waveform timing |
+| PWM Decoder | `test-pwmdecoder-cocotb` | `pwmdecoder` | 4 | Pulse width measurement |
+| ESC UART | `test-wb-esc-uart-cocotb` | `wb_esc_uart` | 5 | TX ready/baud/start-bit/active/completion |
+| E2E FCSP→WB→IO | `test-e2e-fcsp-wb-io-cocotb` | `fcsp_offloader_top` | 3 | Full FCSP READ_BLOCK WHO_AM_I, PING, HELLO |
+| Teaching examples | `test-teaching-examples-cocotb` | Various | Various | Wishbone/AXIS reference patterns |
+| HW scripts sim | `test-hw-scripts-sim` | N/A | Various | Python HW test scripts in sim mode |
+
+### Aggregate gates
+
+| Gate | Makefile target | Includes |
+|------|----------------|----------|
+| Smoke | `test-fcsp-smoke-cocotb` | parser + TX arbiter |
+| All | `test-all` | Python + smoke + teaching |
+| **All strict** | `test-all-strict` | All above + top + experimental + serial-mux + LED + WB-master + IO-bus + DShot + NeoPixel + PWM + ESC-UART + E2E-WB-IO |
+
+**Current regression: 68 cocotb tests + 26 Python tests = 94 total, all passing.**
 
 ## Recommended full local validation run
 

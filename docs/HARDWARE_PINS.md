@@ -1,5 +1,9 @@
 # Tang Nano 9K Hardware Pin Reference
 
+> **Canonical pin source for the project.** Other documents reference this file for pin assignments.
+> **Register map for mux control:** [DESIGN.md](DESIGN.md) §5.4
+> **Passthrough wiring guide:** [BLHELI_QUICKSTART.md](BLHELI_QUICKSTART.md)
+
 ## Physical Pin Mapping
 
 | Pin | Signal Name    | Direction | Function                              |
@@ -18,10 +22,10 @@
 | 16  | o_led_6        | Output    | On-board LED 6 (status/debug)         |
 | 19  | i_usb_uart_rx  | Input     | USB-UART RX (Configurator Link)       |
 | 20  | o_usb_uart_tx  | Output    | USB-UART TX (Configurator Link)       |
-| 51  | o_motor1       | Output    | Motor 1 / ESC Passthrough             |
-| 42  | o_motor2       | Output    | Motor 2 / ESC Passthrough             |
-| 41  | o_motor3       | Output    | Motor 3 / ESC Passthrough             |
-| 35  | o_motor4       | Output    | Motor 4 / ESC Passthrough             |
+| 51  | pad_motor[0]   | Bidirectional | Motor 1 / ESC Passthrough (IOBUF, tristate) |
+| 42  | pad_motor[1]   | Bidirectional | Motor 2 / ESC Passthrough (IOBUF, tristate) |
+| 41  | pad_motor[2]   | Bidirectional | Motor 3 / ESC Passthrough (IOBUF, tristate) |
+| 35  | pad_motor[3]   | Bidirectional | Motor 4 / ESC Passthrough (IOBUF, tristate) |
 | 40  | o_neopixel     | Output    | WS2812 RGB LED Data                   |
 
 NeoPixel payload width is parameterized in the top-level seam via `NEO_RGB_WIDTH` (default `24`, e.g., RGB888). Physical NeoPixel pin mapping is unchanged.
@@ -30,9 +34,9 @@ NeoPixel payload width is parameterized in the top-level seam via `NEO_RGB_WIDTH
 
 There are currently two relevant paths in this repo:
 
-1. **FCSP seam path (`fcsp_io_engines`)**
-        - Current scaffold behavior does **not** synthesize full WS2812/SK6812 waveforms yet.
-        - It forwards `i_neo_rgb[0]` to `o_neo_data` and pulses `o_neo_busy` for one cycle on `i_neo_update`.
+1. **Production path (`fcsp_io_engines` → `wb_neoPx` → `sendPx_axis_flexible`)**
+        - Full WS2812/SK6812 waveform generation is integrated and functional.
+        - `wb_neoPx` provides an 8-pixel buffer with trigger. `sendPx_axis_flexible` generates the bit-level timing.
 
 2. **Legacy Wishbone NeoPixel path (`wb_spisystem` → `wb_neoPx` → `sendPx_axis_flexible`)**
         - This is where full bit-level NeoPixel timing is generated.
@@ -58,7 +62,9 @@ Current wrapper PLL settings target approximately **54 MHz** `sys_clk` from the 
 
 ## ESC Configuration Wiring
 
-The Tang Nano 9k provides a bidirectional hardware bridge for ESC configuration. This bridge is enabled by software via FCSP register `0x0020`.
+The Tang Nano 9k provides a bidirectional hardware bridge for ESC configuration. This bridge is controlled via the Serial/DShot Mux register at absolute address `0x40000400`.
+
+> **Note:** Channel `0x05` (ESC_SERIAL) stream path is fully wired: `fcsp_router` → `fcsp_io_engines` → `wb_esc_uart` TX/RX → `fcsp_stream_packetizer` → TX arbiter. See [DESIGN.md](DESIGN.md) §2.7 for the complete datapath.
 
 ```
                     ┌─────────────────┐
@@ -78,17 +84,19 @@ The Tang Nano 9k provides a bidirectional hardware bridge for ESC configuration.
      │  GND ◄────────────────────── GND             │
      │                                              │
      │  Motor Pins (51, 42, 41, 35) ◄──► ESC Signal │
-     │  (Select channel via Mode Register 0x20)     │
+     │  (Select channel via Mux Register 0x40000400) │
      │  GND ◄──────────────────────────► ESC GND    │
      └──────────────────────────────────────────────┘
 ```
 
-## Motor Configuration Logic (Register 0x0020)
+## Motor Configuration Logic (Register `0x40000400`)
 
-To configure an ESC, the host script must:
-1.  **Select the Channel**: Set bits [2:1] to the motor number (0-3).
-2.  **Toggle Passthrough**: Set bit [0] to 1 to enable the bridge.
-3.  **Execute Break**: Toggle bit [4] to 1 then 0 to trigger the ESC bootloader.
+To configure an ESC, the host writes the Serial/DShot Mux register:
+1.  **Select the Channel**: Set bits [2:1] to the motor number (0–3).
+2.  **Toggle Passthrough**: Set bit [0] to **0** to enable serial/passthrough mode (default is 1 = DShot).
+3.  **Execute Break**: Set bit [4] to 1 (force pin LOW for ≥20 ms), then set bit [4] to 0 (release) to trigger the ESC bootloader.
+
+> **Full passthrough sequence:** [DESIGN.md](DESIGN.md) §6
 
 | Motor    | Channel Select | Pin |
 |----------|----------------|-----|

@@ -6,15 +6,18 @@ This report documents the timing-critical transitions for the **Pure Hardware Sw
 
 The BLHeli bootloader (SiLabs/EFM8) requires a specific physical sequence on the signal wire to enter programming mode instead of flight mode.
 
+> **Full bootloader entry sequence and register values:** [DESIGN.md](DESIGN.md) §6
+> **ESC bootloader firmware internals:** [BLUEJAY_ESC_ANALYSIS.md](BLUEJAY_ESC_ANALYSIS.md) §9
+
 ### Sequence Details (Hardware Level)
 
 | Step | Action | Logic State | Duration |
 |------|--------|-------------|----------|
 | 1 | Idle / Flight | DShot Pulses | Continuous |
-| 2 | **Enable Switch** | Set Reg 0x20[0]=1 | ~18ns (1 clock) |
-| 3 | **Execute Break** | Set Reg 0x20[4]=1 | **100ms - 250ms** |
-| 4 | **Release Break** | Set Reg 0x20[4]=0 | ~18ns |
-| 5 | **Init Flash** | Send 0x05 Stream | Immediate |
+| 2 | **Enable Switch** | Write `0x40000400` ← `0x04` (serial mode, ch 2) | ~18 ns (1 clock) |
+| 3 | **Execute Break** | Write `0x40000400` ← `0x14` (force_low=1) | **20–250 ms** |
+| 4 | **Release Break** | Write `0x40000400` ← `0x04` (force_low=0) | ~18 ns |
+| 5 | **Init Flash** | Send CH 0x05 stream | Immediate |
 
 ## Pure Hardware Performance vs. PICO/PIO
 
@@ -103,7 +106,7 @@ most from physical locality + additional staging (not only boolean simplificatio
 
 ✅ **Passthrough Latency**: Sub-microsecond (Pure RTL).
 ✅ **Transition Time**: Consistent 18.5ns.
-✅ **Break Signal Capability**: Supported via Hardware Register `0x20` Bit [4].
+✅ **Break Signal Capability**: Supported via Serial/DShot Mux register (`0x40000400`) bit [4].
 ✅ **Channel Isolation**: Software can select exactly which motor receives the configuration stream while keeping others idle.
 
 ## Design Conclusion

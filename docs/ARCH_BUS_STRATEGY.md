@@ -1,7 +1,10 @@
 # FCSP Bus Strategy Decision (Tang9K)
 
 Date: 2026-04-04
-Status: Accepted (implementation target)
+Status: Accepted (implemented)
+
+> **Implementation details:** [DESIGN.md](DESIGN.md) §2 — Bus & Transport Architecture.
+> **Master module hierarchy:** [DESIGN.md](DESIGN.md) §1.
 
 ## Decision
 

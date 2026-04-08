@@ -13,8 +13,14 @@ Real-time flight-controller offloader repository for FPGA/RTL-centered transport
 
 ### Setup docs map (read this first)
 
-- **Master RTL architecture reference (modules, buses, registers, datapaths):**
+- **Master RTL architecture reference (modules, buses, registers, datapaths, known gaps):**
 	- `docs/DESIGN.md`
+- **Open tasks, feature backlog, integration milestones:**
+	- `GITHUB_TODO.md`
+- **Project requirements & quality gates:**
+	- `REQUIREMENTS.md`
+- **AI prompt guide (mission, guardrails, canonical sources):**
+	- `PROMPT.md`
 - Full toolchain installation and verification:
 	- `docs/TOOLCHAIN_SETUP.md`
 - Tang Nano 9K build/program workflow:
@@ -24,7 +30,7 @@ Real-time flight-controller offloader repository for FPGA/RTL-centered transport
 - Python utilities and script usage:
 	- `python/README.md`
 
-For AI/automation workflows: treat the files above as authoritative setup sources before running commands.
+For AI/automation workflows: start with `PROMPT.md` for mission context, then `docs/DESIGN.md` for architecture, then `GITHUB_TODO.md` for open work.
 
 Minimal bring-up from repository root:
 

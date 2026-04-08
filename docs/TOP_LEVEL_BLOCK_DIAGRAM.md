@@ -2,6 +2,9 @@
 
 This is the canonical architectural view for the current FCSP offloader integration at 54 MHz.
 
+> **Module hierarchy and register details:** [DESIGN.md](DESIGN.md)
+> **Block responsibilities and implementation status:** [FPGA_BLOCK_DESIGN.md](FPGA_BLOCK_DESIGN.md)
+
 ```mermaid
 flowchart TD
     %% Host Inputs
@@ -20,7 +23,7 @@ flowchart TD
 
     %% Actuator Paths
     subgraph Control_Plane [Control Plane - CH: 0x01]
-        SERV_BRIDGE[fcsp_serv_bridge\nFCSP<->SERV Stream Adapter]
+        WB_MASTER[fcsp_wishbone_master\nDirect WB READ/WRITE_BLOCK]
     end
 
     subgraph Passthrough_Stream [ESC Passthrough - CH: 0x05]
@@ -41,12 +44,12 @@ flowchart TD
     ARB --> PARSER --> CRC --> ROUTER
 
     %% Routing
-    ROUTER -->|CONTROL| SERV_BRIDGE
+    ROUTER -->|CONTROL| WB_MASTER
     ROUTER -->|ESC_SERIAL| STREAM_FIFO
     STREAM_FIFO <--> UART_CORE
 
     %% Control Map
-    SERV_BRIDGE -.serv cmd/rsp.-> WB_BUS[[Wishbone / IO Subsystem]]
+    WB_MASTER -.WB bus.-> WB_BUS[[Wishbone / IO Subsystem]]
     WB_BUS <--> DSHOT
     WB_BUS <--> NEO
     WB_BUS <--> UART_CORE : "Baud Rate Config"
@@ -64,8 +67,9 @@ flowchart TD
 ## Functional Principles
 
 ### 1) Deterministic Control Seam
-Channel `0x01` is currently handled by `fcsp_serv_bridge` at the top-level seam.
-This is a legacy stream-adapter module name, not an indication that an embedded soft CPU is in use.
+Channel `0x01` is handled by `fcsp_wishbone_master` inside `fcsp_offloader_top`. It decodes READ_BLOCK / WRITE_BLOCK ops and drives the internal Wishbone bus directly — no CPU or firmware involved.
+
+> **Note:** Channel `0x05` (ESC_SERIAL) is fully wired: router → `fcsp_io_engines` → `wb_esc_uart` TX/RX → `fcsp_stream_packetizer` → TX arbiter. See [DESIGN.md](DESIGN.md) §2.7 for the complete datapath.
 
 ### 2) Zero-Wait Passthrough
 When the `Mode Select` register is set, the motor pins are physically disconnected from the DShot engine and wired to the `ESC_SERIAL` stream. This provides the microsecond-level timing accuracy needed for ESC bootloader entry.
@@ -75,6 +79,7 @@ Both SPI and USB-CDC flow into the same hardware parser via a **priority selecti
 
 ## Related Documentation
 
-- `docs/FPGA_BLOCK_DESIGN.md`: Deep dive into block implementation.
-- `docs/FCSP_PROTOCOL.md`: Wire-format and register map details.
-- `docs/TIMING_REPORT.md`: Detailed switch-over timing analysis.
+- [DESIGN.md](DESIGN.md): Master RTL architecture reference (modules, buses, registers, datapaths).
+- [FPGA_BLOCK_DESIGN.md](FPGA_BLOCK_DESIGN.md): Block responsibilities and Mermaid diagram.
+- [FCSP_PROTOCOL.md](FCSP_PROTOCOL.md): Wire format, channel definitions, CONTROL payload ops.
+- [TIMING_REPORT.md](TIMING_REPORT.md): Switch-over timing and FPGA compile analysis.

@@ -79,15 +79,26 @@ PWMDECODER_SOURCES := \
 WB_ESC_UART_SOURCES := \
 	$(ROOT_DIR)/rtl/io/wb_esc_uart.sv
 
+STREAM_PACKETIZER_SOURCES := \
+	$(ROOT_DIR)/rtl/fcsp/fcsp_stream_packetizer.sv
+
 export PYTHONPATH := $(SIM_DIR):$(SIM_DIR)/cocotb:$(PYTHONPATH)
 
 SIM ?= verilator
-EXTRA_ARGS += --Wno-WIDTH --Wno-CASEINCOMPLETE --Wno-PINMISSING --Wno-WIDTHEXPAND
+EXTRA_ARGS += --Wno-WIDTH --Wno-CASEINCOMPLETE --Wno-PINMISSING
+# --Wno-WIDTHEXPAND was split from WIDTH in Verilator ~5.026; older versions
+# subsume it under --Wno-WIDTH.  Probe support so CI works with both.
+_VL_WE_OK := $(shell echo 'module _t; endmodule' > /tmp/_vl_we_test.sv && \
+  verilator --Wno-WIDTHEXPAND --lint-only /tmp/_vl_we_test.sv >/dev/null 2>&1 && echo yes; \
+  rm -f /tmp/_vl_we_test.sv)
+ifeq ($(_VL_WE_OK),yes)
+EXTRA_ARGS += --Wno-WIDTHEXPAND
+endif
 
 PYTEST ?= $(if $(wildcard $(ROOT_DIR)/.venv/bin/pytest),$(ROOT_DIR)/.venv/bin/pytest,pytest)
 COCOTB_CONFIG ?= $(if $(wildcard $(ROOT_DIR)/.venv/bin/cocotb-config),$(ROOT_DIR)/.venv/bin/cocotb-config,cocotb-config)
 
-.PHONY: test-cocotb test-python test-hw-scripts-sim test-all test-all-strict test-top-cocotb test-top-cocotb-experimental test-fcsp-integration-cocotb test-wb-example-cocotb test-axis-example-cocotb test-tx-fifo-cocotb test-tx-arbiter-cocotb test-serial-mux-cocotb test-wb-led-cocotb test-fcsp-wb-master-cocotb test-e2e-all-cocotb test-fcsp-smoke-cocotb test-teaching-examples-cocotb fit-evidence-snapshot fit-evidence-snapshot-live
+.PHONY: test-cocotb test-python test-hw-scripts-sim test-all test-all-strict test-top-cocotb test-top-cocotb-experimental test-fcsp-integration-cocotb test-wb-example-cocotb test-axis-example-cocotb test-tx-fifo-cocotb test-tx-arbiter-cocotb test-serial-mux-cocotb test-wb-led-cocotb test-fcsp-wb-master-cocotb test-e2e-all-cocotb test-fcsp-smoke-cocotb test-teaching-examples-cocotb test-stream-packetizer-cocotb test-e2e-esc-roundtrip-cocotb fit-evidence-snapshot fit-evidence-snapshot-live
 
 check-cocotb:
 	@if [ -z "$(COCOTB_MAKEFILES)" ]; then \
@@ -162,6 +173,14 @@ test-e2e-fcsp-wb-io-cocotb: check-cocotb
 	rm -rf sim_build results.xml
 	$(MAKE) -C . sim TOPLEVEL=fcsp_offloader_top COCOTB_TEST_MODULES=test_e2e_fcsp_wb_io_cocotb VERILOG_SOURCES="$(FCSP_TOP_SOURCES)"
 
+test-stream-packetizer-cocotb: check-cocotb
+	rm -rf sim_build results.xml
+	$(MAKE) -C . sim TOPLEVEL=fcsp_stream_packetizer COCOTB_TEST_MODULES=test_fcsp_stream_packetizer_cocotb VERILOG_SOURCES="$(STREAM_PACKETIZER_SOURCES)" EXTRA_ARGS="$(EXTRA_ARGS) -GMAX_LEN=16 -GTIMEOUT=1000"
+
+test-e2e-esc-roundtrip-cocotb: check-cocotb
+	rm -rf sim_build results.xml
+	$(MAKE) -C . sim TOPLEVEL=fcsp_offloader_top COCOTB_TEST_MODULES=test_e2e_esc_roundtrip_cocotb VERILOG_SOURCES="$(FCSP_TOP_SOURCES)"
+
 test-e2e-all-cocotb: test-top-cocotb test-top-cocotb-experimental test-serial-mux-cocotb test-wb-led-cocotb test-fcsp-wb-master-cocotb test-wb-io-bus-cocotb test-dshot-out-cocotb test-wb-neopx-cocotb test-pwmdecoder-cocotb test-wb-esc-uart-cocotb test-e2e-fcsp-wb-io-cocotb
 
 # Default smoke gate stays deterministic and fast.
@@ -178,7 +197,7 @@ test-hw-scripts-sim:
 test-all: test-python test-hw-scripts-sim test-fcsp-smoke-cocotb test-teaching-examples-cocotb
 
 # Strict gate includes top-level and integration-oriented suites.
-test-all-strict: test-all test-top-cocotb test-top-cocotb-experimental test-serial-mux-cocotb test-wb-led-cocotb test-fcsp-wb-master-cocotb test-wb-io-bus-cocotb test-dshot-out-cocotb test-wb-neopx-cocotb test-pwmdecoder-cocotb test-wb-esc-uart-cocotb test-e2e-fcsp-wb-io-cocotb
+test-all-strict: test-all test-top-cocotb test-top-cocotb-experimental test-serial-mux-cocotb test-wb-led-cocotb test-fcsp-wb-master-cocotb test-wb-io-bus-cocotb test-dshot-out-cocotb test-wb-neopx-cocotb test-pwmdecoder-cocotb test-wb-esc-uart-cocotb test-e2e-fcsp-wb-io-cocotb test-stream-packetizer-cocotb test-e2e-esc-roundtrip-cocotb
 
 fit-evidence-snapshot:
 	bash ../scripts/generate_fit_evidence_snapshot.sh

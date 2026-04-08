@@ -247,7 +247,7 @@ module fcsp_offloader_top #(
         .m_esc_tvalid   (router_esc_tvalid),
         .m_esc_tdata    (router_esc_tdata),
         .m_esc_tlast    (router_esc_tlast),
-        .m_esc_tready   (1'b1),
+        .m_esc_tready   (router_esc_tready),
         .o_route_valid  (router_route_valid),
         .o_route_drop   (router_route_drop),
         .o_route_channel(router_route_channel)
@@ -291,10 +291,19 @@ module fcsp_offloader_top #(
     logic [15:0] dbg_tx_seq, dbg_tx_payload_len;
     logic        dbg_tx_overflow, dbg_tx_frame_seen;
 
-    // ESC egress path is not implemented in this integration revision.
-    // Tie the arbiter's optional ESC producer input off explicitly so
-    // synthesis does not create undriven internal nets for the unused port set.
-    logic        esc_tx_tready_unused;
+    // ─── ESC CH 0x05 stream path ────────────────────────────────────
+    // Router ESC output → io_engines TX stream → ESC UART → pad
+    // ESC UART RX stream → packetizer → arbiter ESC input → framer → host
+    logic        router_esc_tready;
+
+    logic [7:0]  esc_rx_tdata;
+    logic        esc_rx_tvalid;
+    logic        esc_rx_tready;
+
+    logic [7:0]  esc_pkt_tdata;
+    logic        esc_pkt_tvalid;
+    logic        esc_pkt_tlast;
+    logic        esc_pkt_tready;
 
     fcsp_rx_fifo #(
         .DEPTH(STREAM_FIFO_DEPTH)
@@ -436,11 +445,11 @@ module fcsp_offloader_top #(
         .s_ctrl_channel(ctrl_tx_channel),
         .s_ctrl_flags  (ctrl_tx_flags),
         .s_ctrl_seq    (ctrl_tx_seq),
-        .s_esc_tvalid  (1'b0),
-        .s_esc_tdata   (8'h00),
-        .s_esc_tlast   (1'b0),
-        .s_esc_tready  (esc_tx_tready_unused),
-        .s_esc_channel (8'h00),
+        .s_esc_tvalid  (esc_pkt_tvalid),
+        .s_esc_tdata   (esc_pkt_tdata),
+        .s_esc_tlast   (esc_pkt_tlast),
+        .s_esc_tready  (esc_pkt_tready),
+        .s_esc_channel (8'h05),
         .s_esc_flags   (8'h00),
         .s_esc_seq     (16'h0000),
         .s_dbg_tvalid  (dbg_tx_fifo_tvalid),
@@ -527,6 +536,12 @@ module fcsp_offloader_top #(
         .pc_rx_data      (pc_rx_data),
         .pc_rx_valid     (pc_rx_valid),
         .o_esc_tx_active (o_esc_tx_active),
+        .s_esc_tdata     (router_esc_tdata),
+        .s_esc_tvalid    (router_esc_tvalid),
+        .s_esc_tready    (router_esc_tready),
+        .m_esc_tdata     (esc_rx_tdata),
+        .m_esc_tvalid    (esc_rx_tvalid),
+        .m_esc_tready    (esc_rx_tready),
         .led_adr_o       (led_adr_o),
         .led_dat_o       (led_dat_o),
         .led_dat_i       (led_dat_i),
@@ -535,6 +550,23 @@ module fcsp_offloader_top #(
         .led_cyc_o       (led_cyc_o),
         .led_stb_o       (led_stb_o),
         .led_ack_i       (led_ack_i)
+    );
+
+    // ─── ESC stream packetizer ──────────────────────────────────────
+    // Collects raw ESC UART RX bytes into framed payloads for the TX arbiter.
+    fcsp_stream_packetizer #(
+        .MAX_LEN (16),
+        .TIMEOUT (1000)
+    ) u_esc_packetizer (
+        .clk      (clk),
+        .rst      (rst),
+        .s_tdata  (esc_rx_tdata),
+        .s_tvalid (esc_rx_tvalid),
+        .s_tready (esc_rx_tready),
+        .m_tdata  (esc_pkt_tdata),
+        .m_tvalid (esc_pkt_tvalid),
+        .m_tlast  (esc_pkt_tlast),
+        .m_tready (esc_pkt_tready)
     );
 
     // -----------------------------
@@ -569,7 +601,6 @@ module fcsp_offloader_top #(
                    ^ router_tel_tvalid ^ router_tel_tdata[0] ^ router_tel_tlast
                    ^ router_log_tvalid ^ router_log_tdata[0] ^ router_log_tlast
                    ^ router_dbg_tvalid ^ router_dbg_tdata[0] ^ router_dbg_tlast
-                   ^ router_esc_tvalid ^ router_esc_tdata[0] ^ router_esc_tlast
                    ^ router_route_valid ^ router_route_drop ^ router_route_channel[0]
                    ^ ctrl_rx_channel[0] ^ ctrl_rx_flags[0] ^ ctrl_rx_seq[0]
                    ^ ctrl_rx_payload_len[0] ^ ctrl_rx_overflow ^ ctrl_rx_frame_seen
@@ -584,7 +615,6 @@ module fcsp_offloader_top #(
                    ^ ctrl_tx_meta_seq[0] ^ tx_wire_tvalid ^ tx_wire_tready
                    ^ tx_wire_tdata[0] ^ tx_framer_busy ^ tx_framer_overflow
                    ^ tx_framer_frame_done
-                   ^ esc_tx_tready_unused
                    ^ s_dbg_tx_tvalid ^ s_dbg_tx_tdata[0] ^ s_dbg_tx_tlast
                    ^ s_dbg_tx_tready ^ s_dbg_tx_channel[0] ^ s_dbg_tx_flags[0]
                    ^ s_dbg_tx_seq[0] ^ tx_arb_tvalid ^ tx_arb_tlast

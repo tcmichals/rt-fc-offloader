@@ -49,6 +49,14 @@ module fcsp_io_engines #(
     // (internal wiring; exposed here only for optional external debug taps)
     output logic        o_esc_tx_active,
 
+    // ESC UART stream interface (FCSP CH 0x05 passthrough)
+    input  logic [7:0]  s_esc_tdata,
+    input  logic        s_esc_tvalid,
+    output logic        s_esc_tready,
+    output logic [7:0]  m_esc_tdata,
+    output logic        m_esc_tvalid,
+    input  logic        m_esc_tready,
+
     // LED controller slave (directly wired to wb_io_bus)
     // LED slave WB signals exposed for external LED controller hookup
     output logic [31:0] led_adr_o,
@@ -158,18 +166,24 @@ module fcsp_io_engines #(
     wb_esc_uart #(
         .CLK_FREQ_HZ (CLK_FREQ_HZ)
     ) u_esc_uart (
-        .clk       (clk),
-        .rst       (rst),
-        .wb_adr_i  (esc_adr),
-        .wb_dat_i  (esc_wdat),
-        .wb_dat_o  (esc_rdat),
-        .wb_we_i   (esc_we),
-        .wb_stb_i  (esc_stb),
-        .wb_cyc_i  (esc_cyc),
-        .wb_ack_o  (esc_ack),
-        .tx_out    (esc_tx_out),
-        .rx_in     (esc_rx_in),
-        .tx_active (esc_tx_act)
+        .clk          (clk),
+        .rst          (rst),
+        .wb_adr_i     (esc_adr),
+        .wb_dat_i     (esc_wdat),
+        .wb_dat_o     (esc_rdat),
+        .wb_we_i      (esc_we),
+        .wb_stb_i     (esc_stb),
+        .wb_cyc_i     (esc_cyc),
+        .wb_ack_o     (esc_ack),
+        .tx_out       (esc_tx_out),
+        .rx_in        (esc_rx_in),
+        .tx_active    (esc_tx_act),
+        .s_esc_tdata  (s_esc_tdata),
+        .s_esc_tvalid (s_esc_tvalid),
+        .s_esc_tready (s_esc_tready),
+        .m_esc_tdata  (m_esc_tdata),
+        .m_esc_tvalid (m_esc_tvalid),
+        .m_esc_tready (m_esc_tready)
     );
 
     assign o_esc_tx_active = esc_tx_act;

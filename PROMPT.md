@@ -8,7 +8,7 @@ Build a deterministic offloader path where:
 
 - FCSP is the protocol layer
 - SPI is the primary physical layer for offloader ↔ flight-controller
-- SERV 8-bit @ 50 MHz runs control-plane logic
+- `fcsp_wishbone_master` (pure RTL) executes control-plane ops directly on the Wishbone bus
 - timing-critical paths stay in RTL
 
 ## Canonical sources
@@ -20,10 +20,10 @@ Do not create duplicate FCSP spec files in companion repos.
 
 ## Core implementation split
 
-- `rtl/fcsp/` → framing, sync, CRC16, channel routing, FIFOs
-- `rtl/io/` → PWM decode, DSHOT, LED/NeoPixel, SPI bridge I/O
-- `firmware/serv8/` → control ops, policy/state transitions, error/result mapping
-- `sim/` → parser/link tests and integration harnesses
+- `rtl/fcsp/` → framing, sync, CRC16, channel routing, FIFOs, Wishbone master, TX egress
+- `rtl/io/` → PWM decode, DSHOT, LED/NeoPixel, ESC UART, serial/DShot pin mux
+- `sim/` → parser/link tests and integration harnesses (Verilator + cocotb)
+- `python/hw/` → hardware test scripts (USB-UART via `hwlib.FcspControlClient`)
 
 ## Guardrails
 
@@ -38,7 +38,7 @@ Do not create duplicate FCSP spec files in companion repos.
 ## Suggested prompt snippet
 
 > Implement the next smallest FCSP milestone in `rt-fc-offloader`.
-> Use `docs/FCSP_PROTOCOL.md` as canonical.
-> Keep RTL on the fast path (framing/CRC/routing), and keep SERV focused on control policy.
+> Use `docs/DESIGN.md` as the master architecture reference and `docs/FCSP_PROTOCOL.md` as canonical protocol spec.
+> Keep all control ops in pure RTL via `fcsp_wishbone_master`.
 > Maintain cross-transport protocol equivalence and passthrough safety semantics.
 > Add tests/sim checks for any new op/channel behavior.

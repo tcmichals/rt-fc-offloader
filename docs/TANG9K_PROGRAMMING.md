@@ -122,7 +122,8 @@ The wrapper is intended to make board programming and basic SPI/parser bring-up 
 
 Known interim limits in this board wrapper revision:
 
-- USB-UART physical pins are not yet bridged into FCSP byte-stream ingress/egress.
-- A full on-board control-response firmware endpoint is not yet integrated in this wrapper; control responses are therefore limited in this top-level revision.
+- SPI TX egress is disabled — all responses exit via USB-UART only.
+
+> **Current integration status and remaining gaps:** [DESIGN.md](DESIGN.md) §12
 
 These are integration follow-ups, not blockers for generating/programming a Tang9K bitstream.

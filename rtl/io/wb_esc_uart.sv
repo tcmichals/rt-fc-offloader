@@ -32,7 +32,15 @@ module wb_esc_uart #(
     // Half-duplex serial
     output logic        tx_out,
     input  logic        rx_in,
-    output logic        tx_active
+    output logic        tx_active,
+
+    // Hardware Stream Interface (FCSP CH 0x05 bypass)
+    input  logic [7:0]  s_esc_tdata,
+    input  logic        s_esc_tvalid,
+    output logic        s_esc_tready,
+    output logic [7:0]  m_esc_tdata,
+    output logic        m_esc_tvalid,
+    input  logic        m_esc_tready
 );
 
     // Default baud rate
@@ -65,6 +73,9 @@ module wb_esc_uart #(
     logic        tx_data_valid;
     logic        tx_data_consumed;
 
+    // Stream TX ready — accept when TX idle and no WB byte pending
+    assign s_esc_tready = (tx_state == TX_IDLE) && !tx_data_valid;
+
     always_ff @(posedge clk) begin
         if (rst) begin
             tx_state         <= TX_IDLE;
@@ -91,6 +102,13 @@ module wb_esc_uart #(
                         tx_ready         <= 1'b0;
                         tx_active        <= 1'b1;
                         tx_data_consumed <= 1'b1;
+                    end else if (s_esc_tvalid) begin
+                        tx_shift         <= s_esc_tdata;
+                        tx_state         <= TX_START;
+                        tx_counter       <= clks_per_bit - 16'd1;
+                        tx_out           <= 1'b0;
+                        tx_ready         <= 1'b0;
+                        tx_active        <= 1'b1;
                     end
                 end
 
@@ -177,15 +195,21 @@ module wb_esc_uart #(
 
     always_ff @(posedge clk) begin
         if (rst) begin
-            rx_state   <= RX_IDLE;
-            rx_shift   <= 8'h00;
-            rx_bit_idx <= 3'd0;
-            rx_counter <= 16'd0;
-            rx_data_reg <= 8'h00;
-            rx_valid   <= 1'b0;
+            rx_state     <= RX_IDLE;
+            rx_shift     <= 8'h00;
+            rx_bit_idx   <= 3'd0;
+            rx_counter   <= 16'd0;
+            rx_data_reg  <= 8'h00;
+            rx_valid     <= 1'b0;
+            m_esc_tdata  <= 8'h00;
+            m_esc_tvalid <= 1'b0;
         end else begin
             if (rx_read_ack)
                 rx_valid <= 1'b0;
+
+            // Stream RX handshake clear
+            if (m_esc_tvalid && m_esc_tready)
+                m_esc_tvalid <= 1'b0;
 
             if (tx_active) begin
                 rx_state <= RX_IDLE;
@@ -230,8 +254,10 @@ module wb_esc_uart #(
                     RX_STOP: begin
                         if (rx_counter == 16'd0) begin
                             if (rx_sync == 1'b1) begin
-                                rx_data_reg <= rx_shift;
-                                rx_valid    <= 1'b1;
+                                rx_data_reg  <= rx_shift;
+                                rx_valid     <= 1'b1;
+                                m_esc_tdata  <= rx_shift;
+                                m_esc_tvalid <= 1'b1;
                             end
                             rx_state <= RX_IDLE;
                         end else begin

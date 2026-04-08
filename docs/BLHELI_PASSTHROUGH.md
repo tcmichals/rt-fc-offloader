@@ -2,6 +2,11 @@
 
 This document describes how the **ESC Configurator Python code** should interact with the Pure Hardware Offloader to configure or flash motor ESCs.
 
+> **Quick start:** [BLHELI_QUICKSTART.md](BLHELI_QUICKSTART.md) — wiring and step-by-step usage.
+> **Register map:** [DESIGN.md](DESIGN.md) §5 — complete per-peripheral register definitions.
+> **Bootloader entry sequence:** [DESIGN.md](DESIGN.md) §6 — full hardware-level sequence.
+> **ESC firmware internals:** [BLUEJAY_ESC_ANALYSIS.md](BLUEJAY_ESC_ANALYSIS.md) — Bluejay bootloader and DShot protocol.
+
 ## 1. Unified Transport (FCSP)
 The offloader abstracts the physical USB connection using the **Flight Controller Serial Protocol (FCSP)**. All communication happens over two logical channels:
 *   **Channel 0x01 (CONTROL)**: Used for Wishbone register writes (Configuration/Switching).

@@ -1,56 +1,65 @@
-# Tang Nano 9K BLHeli Passthrough - Quick Reference
+# BLHeli ESC Passthrough — Quick Reference
 
-## What You Need
+> For the full passthrough theory of operation, see [BLHELI_PASSTHROUGH.md](BLHELI_PASSTHROUGH.md).
+> For the register map and hardware details, see [DESIGN.md](DESIGN.md) §5–6.
 
-1. **Tang Nano 9K FPGA board** (programmed with latest bitstream)
-2. **USB-to-TTL serial adapter** (internal Tang Nano USB or external)
-3. **BLHeliSuite** or **BLHeliConfigurator** software
+## Prerequisites
 
-## Wiring (Critical!)
+1. **Tang Nano 9K FPGA board** — programmed with the latest bitstream
+2. **USB-to-TTL serial adapter** — internal Tang Nano USB-UART or external adapter
+3. **ESC configurator software** — [ESC Configurator](https://esc-configurator.com), BLHeliSuite, or BLHeli Configurator
 
-The motor signal wires (GND + Signal) should be connected to the Tang Nano pins. For quadcopters, these are:
-- **Motor 1**: o_motor1
-- **Motor 2**: o_motor2
-- **Motor 3**: o_motor3
-- **Motor 4**: o_motor4
+## Wiring
 
-## Quick Start (Using Hardware Switch)
+Motor signal wires (Signal + GND) connect to the Tang Nano 9K bidirectional motor pads:
 
-### 1. Enable Passthrough
-The host script must enable the hardware bridge:
-```bash
-# Write '1' into register 0x020 (The Switch)
-# This instantly maps all motor pins to the ESC Serial stream (Channel 0x05).
-```
+| Motor | Pin | Signal Name |
+|-------|-----|-------------|
+| Motor 1 | 51 | `pad_motor[0]` |
+| Motor 2 | 42 | `pad_motor[1]` |
+| Motor 3 | 41 | `pad_motor[2]` |
+| Motor 4 | 35 | `pad_motor[3]` |
 
-### 2. Find Serial Port
-The configurator should connect to the Tang Nano's USB-UART port (typically `/dev/ttyUSB0` or `/dev/ttyACM0`).
+> **Important:** FPGA GND and ESC power supply GND must be connected. Without a common ground reference, serial signals will be corrupted.
 
-### 3. Configure BLHeli
-- Open BLHeliSuite, [ESC Configurator](https://esc-configurator.com), etc.
-- Set baud rate to **115200** for the USB Link.
-- Click "Connect" or "Read Setup".
+> **Full pin table:** [HARDWARE_PINS.md](HARDWARE_PINS.md)
 
-### 4. Done!
-- Configure your ESC settings as needed.
-- Write `0` back into register `0x020` when done to restore DShot flight mode.
+## Quick Start
 
-## How It Works
+### Step 1 — Enable Passthrough Mode
+
+The host writes the Serial/DShot Mux register (`0x40000400`) to switch the target motor pad from DShot to serial mode:
 
 ```
-Your PC → USB → FPGA Hardware Bridge (Channel 0x05) → ESC Pins
+WRITE_BLOCK 0x40000400 ← 0x00000000   # Serial mode, motor 1
 ```
 
-- **Hardware Handlers**: No software bridging is involved. Bits flow at the 54MHz system clock.
-- **Protocol**: 4-Way passthrough is handled natively by the router.
+This disconnects the DShot pulse engine and routes the ESC serial stream (Channel 0x05) to the selected motor pad.
 
-## Common Mistake: Missing Common Ground
+### Step 2 — Connect Configurator
 
-Ensure the ground (GND) of the FPGA and the ESC power source are tied together. Without a common ground, the serial signals will be corrupted.
+Open the ESC configurator and connect to the Tang Nano USB-UART port (typically `/dev/ttyUSB0` or `/dev/ttyACM0`). The USB link operates at 1 Mbaud.
+
+### Step 3 — Configure ESC
+
+Use the configurator's standard read/write operations. All serial traffic is tunneled through FCSP Channel 0x05 to the selected motor pad at hardware speed.
+
+### Step 4 — Restore DShot
+
+After configuration is complete, restore DShot mode:
+
+```
+WRITE_BLOCK 0x40000400 ← 0x00000001   # DShot mode (default)
+```
+
+If the Python process crashes or the configurator disconnects, the MSP sniffer watchdog automatically reverts to DShot mode after 5 seconds of inactivity.
 
 ## Mode Reference
 
-| Mode   | Register 0x020 | Hardware Result |
-|--------|----------------|-----------------|
-| DShot  | `0` (Default)  | Motor pins are driven by the high-speed DShot Pulse Engine. |
-| Serial | `1`            | Motor pins are wired directly to the ESC Configurator stream. |
+| Mode | Register Value | Effect |
+|------|---------------|--------|
+| DShot (default) | `0x40000400 = 0x01` | Motor pads driven by DShot pulse engine |
+| Serial passthrough | `0x40000400 = 0x00` | Motor pad routed to ESC serial stream |
+| Bootloader break | `0x40000400 = 0x14` | Selected motor pad forced LOW (hold ≥20 ms, then release) |
+
+> **Detailed passthrough sequence and bootloader entry:** [DESIGN.md](DESIGN.md) §6
