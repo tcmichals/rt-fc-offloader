@@ -11,7 +11,7 @@ This document defines how both repositories evolve FCSP in parallel.
 
 - `rtl/fcsp/` — FCSP framing, CRC, channel routing RTL
 - `rtl/io/` — DSHOT, PWM decode, LED/NeoPixel, SPI bridge RTL
-- `firmware/serv8/` — SERV 8-bit control-plane firmware
+- `firmware/serv8/` — legacy-named control-plane firmware scaffold (name retained for compatibility; does not imply active embedded soft-CPU usage)
 - `sim/` — simulation and protocol verification harnesses
 - `docs/` — protocol and integration docs
 

@@ -152,6 +152,42 @@ Simple mental rule:
 - bytes flowing through a pipeline → AXIS-style seam
 - software/firmware reading or writing registers → Wishbone
 
+### Teaching note: "pure register writes" hides clocking complexity
+
+For classroom use, emphasize that Wishbone control code should be written as
+simple register transactions:
+
+- write address + data
+- wait for ACK
+- optional readback/verify
+
+No software side should bit-bang protocol timing or count waveform cycles.
+Those concerns belong inside dedicated RTL timing engines.
+
+In this repo:
+
+- `wb_led_controller.sv` demonstrates the control-plane side (parameterized
+    register semantics via `LED_WIDTH`).
+- NeoPixel waveform timing belongs in the dedicated timing path (e.g.
+    `wb_neoPx` / `sendPx_axis_flexible`), not in bus/control code.
+
+### How to teach with `docs/TIMING_REPORT.md`
+
+Use the timing report as the bridge between architecture and measured hardware behavior:
+
+- **Control-plane view**: software performs register reads/writes and waits for ACK.
+- **Timing-engine view**: RTL blocks produce deterministic sub-microsecond behavior.
+- **Evidence view**: post-route FMAX, margin, and worst-path data confirm whether the design still meets timing goals.
+
+A simple classroom flow:
+
+1. Show register-level intent (Wishbone transaction model).
+2. Show which RTL block owns timing-critical behavior.
+3. Show timing evidence in `TIMING_REPORT.md` (FMAX/margin/worst path).
+4. Discuss optimization priorities from worst-path decomposition (logic vs routing).
+
+This keeps students from mixing software control semantics with waveform-generation responsibilities.
+
 ---
 
 ## Pattern 5 — Small device testbenches

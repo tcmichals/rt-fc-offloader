@@ -5,7 +5,7 @@ This plan turns the protocol requirements into immediate implementation steps.
 ## Objective
 
 - Validate the **FCSP runtime path on FPGA** first (no Pico dependency).
-- Implement **FCSP runtime path on FPGA** with **SERV 8-bit @ 50 MHz** target.
+- Implement **FCSP runtime path on FPGA** with **CPU-free control endpoint @ 50 MHz** target profile.
 - Advance to the next FCSP test stage only after parity and timing gates are met.
 - Run two synchronized benches: RTL (Verilator/cocotb) and Python FCSP protocol simulator.
 
@@ -95,15 +95,15 @@ Mandatory verification rule:
 ## Scope
 
 - Validate equivalent FCSP semantics over SPI (primary) and serial/sim transport (optional).
-- Confirm SERV 8-bit @ 50 MHz viability with RTL fast path ownership.
-- Enable SERV-originated `DEBUG_TRACE` frame egress over USB-UART for runtime observability.
+- Confirm 50 MHz control-path viability with RTL fast path ownership and no embedded processor dependency.
+- Enable control-endpoint `DEBUG_TRACE` frame egress over USB-UART for runtime observability.
 
 ## Exit criteria
 
 - Semantic parity holds across transport profiles.
 - No per-byte firmware bottleneck in nominal traffic.
 - Deterministic control latency and recovery behavior confirmed.
-- `DEBUG_TRACE` messages produced by SERV are observable on USB-UART and decode as valid FCSP frames.
+- `DEBUG_TRACE` messages produced by the control endpoint are observable on USB-UART and decode as valid FCSP frames.
 - Integration sign-off allowed only after all required block-level suites are green.
 
 ---
@@ -111,7 +111,7 @@ Mandatory verification rule:
 ## Immediate next implementation tasks (start now)
 
 1. Implement RTL parser skeleton (`rtl/fcsp/`).
-2. Implement firmware CONTROL dispatcher skeleton (`firmware/serv8/`).
+2. Implement firmware CONTROL dispatcher skeleton (legacy path is currently under `firmware/serv8/`; naming does not imply active embedded soft-CPU use).
 3. Build RTL simulation tests for parser resync + caps paging (`sim/`).
 4. Build Python FCSP simulator tests for frame/op/result behavior (`sim/python_fcsp/`).
 5. Freeze FCSP baseline behavior snapshots and wire into regression checks.

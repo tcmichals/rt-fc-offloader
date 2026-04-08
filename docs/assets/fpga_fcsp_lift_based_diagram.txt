@@ -71,7 +71,7 @@ Host/FC SPI bytes                                        Host/FC USB CDC/UART by
 
 Control-plane side path (not in raw SPI hot path):
 
-CTRL RX FIFO -> SERV8 Control Dispatch [ADAPT firmware flow]
+CTRL RX FIFO -> Control Dispatch Endpoint [ADAPT firmware flow]
                 |
                 +-> IO Windows [ADAPT]
                     - DSHOT_IO: [LIFT/ADAPT] dshot_out + mailbox + controller
@@ -83,6 +83,6 @@ CTRL RX FIFO -> SERV8 Control Dispatch [ADAPT firmware flow]
 
 Key rule:
 - Raw SPI hot path is RTL-only: SPI Front-End -> Parser -> CRC -> Router -> FIFOs.
-- SERV8 only handles validated CONTROL frames.
+- Control dispatch endpoint only handles validated CONTROL frames.
 - USB serial path is an alternate transport ingress/egress feeding the same FCSP parser/router semantics.
 - Both lanes share one FCSP semantic pipeline after RX arbitration.

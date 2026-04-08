@@ -96,6 +96,17 @@ Good for:
 - PWM capture windows
 - LED/NeoPixel control windows
 
+### Copy/paste mental model: pure register writes
+
+```text
+1) write register address + data
+2) wait for ACK
+3) optional readback/verify
+```
+
+The software/control side does not manage waveform timing.
+Timing/clocking behavior is implemented inside RTL state machines/counters.
+
 ---
 
 ## 5) Device test questions

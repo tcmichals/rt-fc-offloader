@@ -21,9 +21,9 @@ Migration rule:
 
 1. Canonical FCSP ownership in this repo:
    - `docs/FCSP_PROTOCOL.md`
-2. 50 MHz SERV-8 profile viability with RTL fast-path offload.
+2. 50 MHz control-path profile viability with RTL fast-path offload (no embedded soft-CPU dependency).
 3. RTL handles sync/length/CRC/channel routing/FIFO.
-4. SERV handles control policy/state transitions and result codes.
+4. The control endpoint handles policy/state transitions and result codes.
 5. Unified dynamic IO model via FCSP block operations:
    - PWM, DSHOT, LED, NeoPixel handled through discoverable spaces.
 6. Discovery support:
@@ -88,9 +88,9 @@ Mapping stability rules:
 - `READ_BLOCK`/`WRITE_BLOCK` spaces for dynamic IO defined and tested.
 - Cross-transport semantic equivalence validated (SPI primary, serial/sim optional).
 
-### C) SERV 8-bit @ 50 MHz target done
+### C) 50 MHz control-path target done
 
-- Implementation demonstrates SERV 8-bit control-plane viability at 50 MHz profile.
+- Implementation demonstrates control-plane viability at 50 MHz profile without an embedded soft CPU.
 - RTL owns byte-stream fast path (sync/length/CRC/routing/FIFO), firmware owns control policy.
 - No per-byte firmware bottleneck in normal operation (frame/FIFO-driven handling).
 - Deterministic control latency and error handling observed in integration tests.

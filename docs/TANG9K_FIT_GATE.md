@@ -1,6 +1,6 @@
-# Tang Nano 9K Fit Analysis — Pure Hardware Offloader
+# Tang Nano 9K Fit Analysis — FCSP Offloader
 
-This document provides a resource estimation for the finalized **Zero-CPU** architecture on the Tang Nano 9K (GW1NR-9C).
+This document provides a resource estimation for the current FCSP offloader integration on the Tang Nano 9K (GW1NR-9C).
 
 ## Hardware Resource Budget
 
@@ -14,11 +14,11 @@ This document provides a resource estimation for the finalized **Zero-CPU** arch
 
 Our project uses a system clock of **54 MHz** (27MHz crystal * 2 / 1). 
 
-### Why Timing Closure is Effortless:
-1. **CPU-Less Critical Path**: The previous logic bottleneck was the SERV core's ALU-to-memory path. Removing the CPU has eliminated the deepest logic chains.
+### Why Timing Closure is Favorable:
+1. **Moderate Critical Path Depth**: Current stream and routing seams are short and mostly registered.
 2. **Pipelined Datapath**: All FCSP processing (Parser, CRC, Router) is byte-per-cycle and fully registered.
 3. **Low Density**: With only ~15% LUT utilization, `nextpnr-himbaechel` has immense routing freedom, leading to very low wire delay.
 4. **Conclusion**: The 18.5ns (54MHz) and 20ns (50MHz) periods are **extremely conservative**. This logic could comfortably hit **80-100 MHz** before any architectural restructuring was needed.
 
 ## Conclusion
-The **Pure Hardware Switch** design fits **extremely easily** in the Tang Nano 9K with massive timing headroom. There is ample room for expansion without risking timing violations.
+The current FCSP integration fits comfortably in the Tang Nano 9K with healthy timing headroom. There is room for further feature growth, subject to future synthesis/P&R evidence snapshots.

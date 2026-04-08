@@ -11,9 +11,10 @@ Build a deterministic offloader path where:
 - SERV 8-bit @ 50 MHz runs control-plane logic
 - timing-critical paths stay in RTL
 
-## Canonical protocol source
+## Canonical sources
 
-- `docs/FCSP_PROTOCOL.md` (single source of truth)
+- `docs/DESIGN.md` — **master architecture reference** (all modules, buses, address map, registers, datapaths, gaps)
+- `docs/FCSP_PROTOCOL.md` — protocol wire format and channel definitions
 
 Do not create duplicate FCSP spec files in companion repos.
 

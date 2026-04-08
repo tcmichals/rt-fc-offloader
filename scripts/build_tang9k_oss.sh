@@ -29,6 +29,7 @@ require_tool() {
 require_tool yosys
 require_tool nextpnr-himbaechel
 require_tool gowin_pack
+require_tool python3
 
 TIMEOUT_CMD=()
 if [[ "${BUILD_TIMEOUT_SEC}" != "0" ]]; then
@@ -52,10 +53,16 @@ SOURCES=(
   "${ROOT_DIR}/rtl/fcsp/fcsp_tx_framer.sv"
   "${ROOT_DIR}/rtl/fcsp/fcsp_uart_byte_stream.sv"
   "${ROOT_DIR}/rtl/fcsp/fcsp_io_engines.sv"
-  "${ROOT_DIR}/rtl/fcsp/fcsp_debug_generator.sv"
-  "${ROOT_DIR}/rtl/fcsp/drivers/fcsp_dshot_output.sv"
-  "${ROOT_DIR}/rtl/fcsp/drivers/fcsp_dshot_engine.sv"
-  "${ROOT_DIR}/rtl/fcsp/drivers/fcsp_neo_engine.sv"
+  "${ROOT_DIR}/rtl/fcsp/drivers/wb_led_controller.sv"
+  "${ROOT_DIR}/rtl/io/wb_io_bus.sv"
+  "${ROOT_DIR}/rtl/io/wb_dshot_controller.sv"
+  "${ROOT_DIR}/rtl/io/dshot_out.sv"
+  "${ROOT_DIR}/rtl/io/wb_serial_dshot_mux.sv"
+  "${ROOT_DIR}/rtl/io/wb_esc_uart.sv"
+  "${ROOT_DIR}/rtl/io/wb_neoPx.sv"
+  "${ROOT_DIR}/rtl/io/sendPx_axis_flexible.sv"
+  "${ROOT_DIR}/rtl/io/pwmdecoder_wb.sv"
+  "${ROOT_DIR}/rtl/io/pwmdecoder.sv"
 )
 
 echo "[1/3] Synthesizing ${TOP}"
@@ -87,5 +94,12 @@ fi
 
 echo "[3/3] Packing bitstream"
 "${TIMEOUT_CMD[@]}" gowin_pack -d GW1N-9C -o "${OUT_DIR}/hardware.fs" "${OUT_DIR}/hardware_pnr.json"
+
+echo "[post] Generating compile summary (and optional docs/TIMING_REPORT.md auto-update)"
+if python3 "${ROOT_DIR}/python/tools/report_tang9k_build_summary.py" "${OUT_DIR}" "${ROOT_DIR}"; then
+  echo "[post] Compile summary step completed."
+else
+  echo "[post] WARNING: compile summary step failed (non-fatal); bitstream build remains successful." >&2
+fi
 
 echo "Done: ${OUT_DIR}/hardware.fs"

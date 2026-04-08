@@ -1,5 +1,7 @@
 """Cocotb tests for FCSP parser RTL behavior."""
 
+import random
+
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, ReadOnly, NextTimeStep
@@ -25,6 +27,23 @@ async def _drive_bytes(dut, data: bytes) -> None:
         await RisingEdge(dut.clk)
         await ReadOnly()
         await NextTimeStep()
+    dut.in_valid.value = 0
+    await RisingEdge(dut.clk)
+    await ReadOnly()
+    await NextTimeStep()
+
+
+async def _drive_bytes_when_ready(dut, data: bytes) -> None:
+    for b in data:
+        accepted = False
+        while not accepted:
+            dut.in_valid.value = 1
+            dut.in_byte.value = b
+            await RisingEdge(dut.clk)
+            await ReadOnly()
+            accepted = bool(dut.in_ready.value)
+            await NextTimeStep()
+
     dut.in_valid.value = 0
     await RisingEdge(dut.clk)
     await ReadOnly()
@@ -132,4 +151,62 @@ async def parser_rejects_payload_len_over_512(dut) -> None:
     assert saw_len_error, (
         f"expected len_error pulse for payload > 512; header lens seen={observed_payload_len}"
     )
+
+
+@cocotb.test()
+async def parser_handles_random_backpressure_without_data_loss(dut) -> None:
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await _reset(dut)
+
+    rng = random.Random(0xFC5)  # deterministic local seed
+    payload = bytes((i * 7 + 3) & 0xFF for i in range(32))
+    frame = encode_frame(flags=0, channel=0x05, seq=7, payload=payload)
+
+    captured_payload: list[int] = []
+    saw_done = False
+
+    async def _apply_backpressure() -> None:
+        cycle = 0
+        while not saw_done and cycle < 4000:
+            # Keep this deterministic but irregular; force ready high periodically
+            # so the test always makes forward progress.
+            if (cycle % 7) == 0:
+                dut.m_frame_tready.value = 1
+            else:
+                dut.m_frame_tready.value = rng.randint(0, 1)
+            cycle += 1
+            await RisingEdge(dut.clk)
+
+    async def _capture_stream() -> None:
+        nonlocal saw_done
+        while not saw_done:
+            await RisingEdge(dut.clk)
+            await ReadOnly()
+            if bool(dut.m_frame_tvalid.value) and bool(dut.m_frame_tready.value):
+                captured_payload.append(int(dut.m_frame_tdata.value))
+            if bool(dut.o_frame_done.value):
+                saw_done = True
+            await NextTimeStep()
+
+    bp_task = cocotb.start_soon(_apply_backpressure())
+    cap_task = cocotb.start_soon(_capture_stream())
+
+    await _drive_bytes_when_ready(dut, frame)
+
+    for _ in range(4000):
+        if saw_done:
+            break
+        await RisingEdge(dut.clk)
+    else:
+        raise AssertionError("expected frame_done under randomized backpressure")
+
+    # Let helper tasks observe done and exit cleanly.
+    await RisingEdge(dut.clk)
+    await bp_task
+    await cap_task
+
+    assert bytes(captured_payload) == payload, (
+        f"payload mismatch under backpressure: expected {payload!r}, got {bytes(captured_payload)!r}"
+    )
+    assert int(dut.o_len_error.value) == 0, "len_error should remain low for valid frame"
 

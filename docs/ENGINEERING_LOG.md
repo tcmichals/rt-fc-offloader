@@ -10,7 +10,37 @@ Use it for:
 - validation milestones
 - known pain points and why choices were made
 
+Historical note:
+
+- Older entries may reference SERV/SERV8 terms from prior exploration milestones.
+- Those terms are intentionally preserved in this log for historical traceability.
+- Current project direction is no active embedded soft-CPU dependency; treat SERV/SERV8 references here as legacy context, not current architecture requirements.
+
 Newest entries should be added near the top.
+
+---
+
+## 2026-04-05 — Teaching focus: pure register writes for control; timing stays in RTL
+
+- Captured and reinforced a core teaching rule for this repo:
+  - control software should use **pure Wishbone register transactions** (`write/read + ack`)
+  - cycle-accurate timing generation stays inside dedicated RTL engines
+- `wb_led_controller.sv` is now explicitly treated as a classroom example of this split:
+  - parameterized control surface (`LED_WIDTH`)
+  - simple register map semantics (`OUT`, `TOGGLE`, `CLEAR`, `SET`)
+  - no software-managed timing loops
+- Added matching teaching context for NeoPixel paths:
+  - FCSP seam (`fcsp_io_engines`) remains scaffold-level behavior in current integration
+  - legacy NeoPixel engine path (`wb_neoPx` + `sendPx_axis_flexible`) is the full timing-generator reference
+- External comparison pass (Horton + splinedrive) confirmed the same architectural lesson:
+  - ingress/control API should be simple and deterministic
+  - waveform timing should be isolated in RTL state machines/counters
+
+Why it matters:
+
+- keeps control code portable and easy to reason about
+- keeps nanosecond-level protocol behavior deterministic in hardware
+- improves classroom value by clearly separating control-plane vs timing-engine responsibilities
 
 ---
 
@@ -340,7 +370,7 @@ Why it matters:
 - Instead, we reused the existing `fcsp_crc16` / `fcsp_crc16_core_xmodem` path and wrapped it with a small `fcsp_crc_gate` stage.
 - The gate buffers one parsed frame payload, reconstructs the FCSP CRC input stream (`version`, `flags`, `channel`, `seq`, `payload_len`, `payload`), and compares against the parser-captured wire CRC.
 - Only CRC-clean frames are released downstream to the router.
-- Bad CRC frames are dropped before they can reach SERV.
+- Bad CRC frames are dropped before they can reach the control endpoint.
 
 Why it matters:
 
@@ -352,11 +382,11 @@ Validation status:
 
 - parser cocotb: `3 passed`
 - top-level cocotb smoke: `3 passed`
-- verified case: corrupted CONTROL frame does **not** reach SERV
+- verified case: corrupted CONTROL frame does **not** reach the control endpoint
 
-## 2026-04-03 — Why SERV is used here, and why not a larger softcore
+## 2026-04-03 — Historical note: prior soft-CPU exploration (superseded)
 
-- SERV is being used as the **small control-plane CPU**, not as the FCSP byte-stream engine.
+- At that point in exploration, a small control-plane CPU was being considered, not as the FCSP byte-stream engine.
 - RTL still owns the hot path:
   - sync detect
   - header/length parse
@@ -364,13 +394,11 @@ Validation status:
   - channel routing
   - FIFO buffering
   - timing-critical IO engines
-- SERV only sees **validated CONTROL payloads** after the hardware fast path has already done the heavy lifting.
+- The control endpoint would only see **validated CONTROL payloads** after the hardware fast path had already done the heavy lifting.
 
-Width / mode note:
+Historical mode note:
 
-- The SERV family is attractive here because it can be used in very small configurations, including **1-bit**, **4-bit**, and **8-bit-style** implementation profiles depending on the build/integration strategy.
-- For this repository, the documented target profile is the **SERV8 / 8-bit parallel control-plane** direction.
-- That makes sense for FCSP because the CPU work is mostly:
+- A very small soft-CPU profile was being evaluated at the time for control-plane work:
   - op decode
   - policy/state transitions
   - result code generation
@@ -384,13 +412,12 @@ Why this was preferred over something larger like VexRiscv:
   - CRC math
   - framing/resync
   - DSHOT or other bit-timed engines
-- Those jobs are intentionally kept in RTL, so the CPU can stay small and predictable.
-- That makes a SERV-class core a better fit for early offloader builds where FPGA fabric is more valuable for parsers, FIFOs, and IO engines than for a larger general-purpose processor.
+- Those jobs are intentionally kept in RTL in the current design direction.
 
 Tang9K fit note:
 
 - This choice is aligned with the goal of keeping the design viable on a **Tang9K-class** target, where area pressure matters.
-- The point is not that SERV is universally "better" than VexRiscv; the point is that **a smaller control CPU plus RTL offload** is the right trade for this project.
+- The point of the historical comparison was that **a smaller control CPU plus RTL offload** looked attractive at the time.
 - Exact fit still needs synthesis / place-and-route confirmation once more of the datapath is fully wired in, but the architectural direction is deliberately chosen to keep that target plausible.
 
 Why it matters:
@@ -448,8 +475,8 @@ Why it matters:
 ## 2026-04-03 — Hot path ownership split settled
 
 - Raw transport byte handling stays in RTL.
-- SERV is **not** in the raw SPI byte hot path.
-- SERV handles validated CONTROL-plane frames and policy/state transitions.
+- A control endpoint is **not** in the raw SPI byte hot path.
+- The control endpoint handles validated CONTROL-plane frames and policy/state transitions.
 
 Why it matters:
 

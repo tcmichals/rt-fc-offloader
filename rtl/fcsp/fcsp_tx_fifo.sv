@@ -1,10 +1,9 @@
 `default_nettype none
 
-// FCSP TX FIFO wrapper (Storage seam implementation)
+// FCSP TX FIFO wrapper (skeleton)
 //
-// Incorporates a hardware-friendly FWFT BRAM for Tang9K targets.
-// Utilizes synchronous reads to ensure Block RAM (BSRAM) inference
-// instead of exhausting distributed shadow SRAMs (RAM16SDP4).
+// Mirrors the RX FIFO contract for egress scheduling paths.
+// Current scaffold is pass-through while preserving the future buffering seam.
 module fcsp_tx_fifo #(
     parameter int DEPTH = 512
 ) (
@@ -36,87 +35,79 @@ module fcsp_tx_fifo #(
     output logic        o_frame_seen
 );
     localparam int ADDR_W = (DEPTH <= 2) ? 1 : $clog2(DEPTH);
-    localparam int DATA_W = 8 + 1 + 8 + 8 + 16 + 16; // 57 bits
 
-    // Synchronous Memory inference array
-    logic [DATA_W-1:0] mem [0:DEPTH-1];
+    logic [7:0]  mem_data      [0:DEPTH-1];
+    logic        mem_last      [0:DEPTH-1];
+    logic [7:0]  mem_channel   [0:DEPTH-1];
+    logic [7:0]  mem_flags     [0:DEPTH-1];
+    logic [15:0] mem_seq       [0:DEPTH-1];
+    logic [15:0] mem_payload_len [0:DEPTH-1];
 
     logic [ADDR_W-1:0] wr_ptr;
     logic [ADDR_W-1:0] rd_ptr;
-    logic [ADDR_W:0]   bram_count;
+    logic [ADDR_W:0]   count;
 
     logic push;
-    logic read_en;
-    logic [DATA_W-1:0] dout;
-    logic valid_q;
+    logic pop;
+    logic full;
+    logic empty;
 
-    assign s_tready = (bram_count < DEPTH[ADDR_W:0]);
+    assign full  = (count == DEPTH[ADDR_W:0]);
+    assign empty = (count == '0);
+
+    assign s_tready = ~full;
+    assign m_tvalid = ~empty;
+
+    assign m_tdata       = mem_data[rd_ptr];
+    assign m_tlast       = mem_last[rd_ptr];
+    assign m_channel     = mem_channel[rd_ptr];
+    assign m_flags       = mem_flags[rd_ptr];
+    assign m_seq         = mem_seq[rd_ptr];
+    assign m_payload_len = mem_payload_len[rd_ptr];
+
     assign push = s_tvalid && s_tready;
+    assign pop  = m_tvalid && m_tready;
 
-    // We can read from BRAM if it has elements and either:
-    // - the output register is empty (!valid_q)
-    // - the output register is being consumed this cycle (m_tready && valid_q)
-    assign read_en = (bram_count > 0) && (!valid_q || m_tready);
-
-    logic [DATA_W-1:0] write_data;
-    assign write_data = {s_tdata, s_tlast, s_channel, s_flags, s_seq, s_payload_len};
-
-    // BRAM instance
-    always_ff @(posedge clk) begin
-        if (push) begin
-            mem[wr_ptr] <= write_data;
-        end
-        if (read_en) begin
-            dout <= mem[rd_ptr];
-        end
-    end
-
-    // Internal FIFO counters
     always_ff @(posedge clk) begin
         if (rst) begin
-            wr_ptr <= '0;
-            rd_ptr <= '0;
-            bram_count <= '0;
-            valid_q <= 1'b0;
-            o_overflow <= 1'b0;
+            wr_ptr       <= '0;
+            rd_ptr       <= '0;
+            count        <= '0;
+            o_overflow   <= 1'b0;
             o_frame_seen <= 1'b0;
         end else begin
-            // Track overflow condition
-            o_overflow <= s_tvalid && !s_tready;
-            o_frame_seen <= 1'b0; // Pulse per pop
+            o_overflow   <= 1'b0;
+            o_frame_seen <= 1'b0;
 
-            // valid_q register management (skid logic)
-            if (read_en) begin
-                valid_q <= 1'b1;
-            end else if (m_tready) begin
-                valid_q <= 1'b0;
+            if (s_tvalid && ~s_tready) begin
+                o_overflow <= 1'b1;
             end
 
-            // Pointer updates
             if (push) begin
-                wr_ptr <= wr_ptr + 1'b1;
+                mem_data[wr_ptr]        <= s_tdata;
+                mem_last[wr_ptr]        <= s_tlast;
+                mem_channel[wr_ptr]     <= s_channel;
+                mem_flags[wr_ptr]       <= s_flags;
+                mem_seq[wr_ptr]         <= s_seq;
+                mem_payload_len[wr_ptr] <= s_payload_len;
+                wr_ptr                  <= wr_ptr + 1'b1;
             end
-            if (read_en) begin
+
+            if (pop) begin
                 rd_ptr <= rd_ptr + 1'b1;
             end
 
-            // Counter update
-            unique case ({push, read_en})
-                2'b10: bram_count <= bram_count + 1'b1;
-                2'b01: bram_count <= bram_count - 1'b1;
-                default: bram_count <= bram_count;
+            unique case ({push, pop})
+                2'b10: count <= count + 1'b1;
+                2'b01: count <= count - 1'b1;
+                default: count <= count;
             endcase
 
-            if (valid_q && m_tready && m_tlast) begin
+            if (pop && m_tlast) begin
                 o_frame_seen <= 1'b1;
             end
         end
     end
-
-    // Interface extraction
-    assign m_tvalid = valid_q;
-    assign {m_tdata, m_tlast, m_channel, m_flags, m_seq, m_payload_len} = dout;
-
 endmodule
 
 `default_nettype wire

@@ -1,10 +1,15 @@
 # FPGA Block Design — Pure Hardware FCSP Offloader (54 MHz)
 
-This document defines the finalized, CPU-less FPGA architecture for the FCSP/1 offloader. It eliminates all software dependencies, using dedicated RTL state machines for packet routing and register control.
+This document defines the FCSP/1 offloader architecture and block responsibilities.
+
+## Implementation Status
+
+- Current top-level integration (`fcsp_offloader_top.sv`) uses `fcsp_serv_bridge` as the active control-plane seam.
+- `fcsp_wishbone_master.sv` exists and remains the direct-control target path, but is not the active top-level integration path in this revision.
 
 ## Design Goals
 
-- **Zero-CPU Core**: Maximum deterministic performance and minimal resource usage.
+- **Deterministic Control Path**: Maximum deterministic performance and minimal control-plane jitter.
 - **Hardware-Native Passthrough**: Sub-microsecond latency for ESC configuration.
 - **Unified Command Routing**: Single RTL logic path for both SPI (Flight Controller) and USB (PC/Configurator) ingress.
 - **Wishbone Interior Bus**: Standardized memory-mapped access to all IO engines.
@@ -17,7 +22,7 @@ The design acts as a high-speed hardware switch. Packets are parsed at the "Ingr
 
 ```mermaid
 flowchart LR
-    HOST_SPI[SPI: Linux FC] --> MUX[Ingress Arbiter]
+    HOST_SPI[SPI: Linux FC] --> MUX[Ingress Priority Mux]
     HOST_USB[USB: Configurator] --> MUX
     
     MUX --> PARSER[fcsp_parser\nSync+Header]
@@ -25,11 +30,11 @@ flowchart LR
     CRC --> ROUTER[fcsp_router\nChannel Router]
 
     %% Channels
-    ROUTER -->|CH 0x01| WB_Master[fcsp_wishbone_master\nControl Plane]
+    ROUTER -->|CH 0x01| SERV_BRIDGE[fcsp_serv_bridge\nControl Plane Seam]
     ROUTER -->|CH 0x05| BYPASS[ESC Serial Bridge\nBypass Plane]
 
     %% Logic
-    WB_Master <--> BUS[Wishbone Internal Bus]
+    SERV_BRIDGE -.serv cmd/rsp.-> BUS[Wishbone Internal Bus]
     BUS <--> DSHOT[DShot Motor Engine]
     BUS <--> NEO[NeoPixel Engine]
     
@@ -45,7 +50,7 @@ flowchart LR
 
 ## Block Responsibilities
 
-### 1) Ingress Arbiter & Transports
+### 1) Ingress Priority Mux & Transports
 - **SPI Frontend**: Maps physical SPI pins to a 54MHz byte stream.
 - **UART Byte Stream**: Maps the onboard USB-UART to a 54MHz byte stream (Configurator Path).
 - **Mux**: Automatically selects the active source to feed the main protocol parser.
@@ -60,11 +65,9 @@ flowchart LR
   - **Channel 0x01 (CONTROL)**: Routed to the Wishbone Master.
   - **Channel 0x05 (ESC_SERIAL)**: Routed to the physical pin switch.
 
-### 4) `fcsp_wishbone_master` (The Core Accelerator)
-- **Replaces the SERV CPU**.
-- Parses `WRITE_BLOCK` and `READ_BLOCK` FCSP commands.
-- Generates native 32-bit Wishbone bus cycles to update internal hardware registers.
-- **Speed**: Commands are executed as soon as the last payload byte arrives.
+### 4) Control Plane Handler
+- **Current**: `fcsp_serv_bridge` is integrated in top-level and carries FCSP control payloads to/from SERV stream interfaces.
+- **Target**: `fcsp_wishbone_master` path for direct `WRITE_BLOCK` / `READ_BLOCK` execution.
 
 ### 5) `fcsp_io_engines`
 - Implements the registers for DShot speeds, NeoPixel colors, and the **Hardware Switch**.
@@ -87,6 +90,8 @@ Unlike previous designs where a CPU copied bytes between UARTs, this design uses
 ## Control Register Map
 
 Access via FCSP Channel `0x01` (`WRITE_BLOCK` / `READ_BLOCK`).
+
+Addressing note: this table uses **relative offsets**. Some docs show absolute bus addresses (`0x4000xxxx`) for the same registers.
 
 | Address | Register | Description |
 |---------|----------|-------------|

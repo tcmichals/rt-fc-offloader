@@ -47,25 +47,31 @@ Two complementary benches are required:
 
 From repo root:
 
-1. Ensure venv tools are on `PATH` (for `cocotb-config`):
-	- `PATH="$(pwd)/.venv/bin:$PATH"`
+1. Configure CMake:
+	- `cmake -S . -B build/cmake`
 2. Run protocol simulator tests:
-	- `make -C sim test-python`
+	- `cmake --build build/cmake --target sim-test-python`
+2b. Run python/hw script simulation-compatibility tests:
+	- `cmake --build build/cmake --target sim-test-hw-scripts-sim`
 3. Run parser block cocotb tests:
-	- `make -C sim test-cocotb`
-4. Run top-level cocotb smoke tests:
-	- `make -C sim test-top-cocotb`
-5. Run teaching micro-references:
-	- `make -C sim test-wb-example-cocotb`
-	- `make -C sim test-axis-example-cocotb`
+	- `cmake --build build/cmake --target sim-test-cocotb`
+4. Run top-level cocotb integration tests (experimental):
+	- `cmake --build build/cmake --target sim-test-top-cocotb`
+5. Run teaching micro-reference suite:
+	- `cmake --build build/cmake --target sim-test-teaching-examples`
 
 Convenience aggregate targets:
 
 - FCSP smoke suite:
-	- `make -C sim test-fcsp-smoke-cocotb`
+	- `cmake --build build/cmake --target sim-test-cocotb`
+	- `cmake --build build/cmake --target sim-test-cocotb`
+- Python hardware-script compatibility suite:
+	- `cmake --build build/cmake --target sim-test-hw-scripts-sim`
 - Teaching micro-reference suite:
-	- `make -C sim test-teaching-examples-cocotb`
+	- `cmake --build build/cmake --target sim-test-teaching-examples`
 - Full local regression:
-	- `make -C sim test-all`
+	- `cmake --build build/cmake --target sim-test-all`
+- Experimental top-level integration suite:
+	- `cmake --build build/cmake --target sim-test-top-cocotb`
 - Generate fit-evidence snapshot template:
-	- `make -C sim fit-evidence-snapshot`
+	- `cmake --build build/cmake --target sim-fit-evidence`

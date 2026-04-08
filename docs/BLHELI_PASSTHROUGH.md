@@ -1,71 +1,53 @@
-# BLHeli Passthrough Configuration Guide
+# Theory of Operation: ESC Passthrough (for Python Developers)
 
-## Overview
+This document describes how the **ESC Configurator Python code** should interact with the Pure Hardware Offloader to configure or flash motor ESCs.
 
-The Tang9K FPGA uses a finalized hardware-only architecture to bridge BLHeli ESC configuration between a PC and the ESCs. The system manages the 4-Way Interface protocol and UART bridging directly in RTL, providing a transparent link for ESC configurators.
+## 1. Unified Transport (FCSP)
+The offloader abstracts the physical USB connection using the **Flight Controller Serial Protocol (FCSP)**. All communication happens over two logical channels:
+*   **Channel 0x01 (CONTROL)**: Used for Wishbone register writes (Configuration/Switching).
+*   **Channel 0x05 (ESC_SERIAL)**: Used for high-speed serial data (Firmware/Telemetry).
 
-## Architecture
+## 2. The Step-by-Step Handshake
 
-```
-PC (BLHeliSuite / ESC Configurator)
-        ↓ USB (115200 baud)
-   USB UART → Hardware Router → ESC UART
-                                   ↓ (19200 baud, half-duplex)
-                               Motor Pin [mux_ch]
-                                   ↓
-                                  ESC
-```
+To successfully enter ESC Passthrough mode, the Python code follows this three-stage process:
 
-### How It Works
+### Stage A: Hardware Steering (Wishbone)
+Before sending serial data, you must "steer" the hardware mux to the correct motor channel.
+1.  **Select Motor**: Write to address `0x40000400` (Serial Mux).
+    *   Set **Bit 0**: `0` (Serial Mode).
+    *   Set **Bits 2:1**: `0-3` (Which motor channel to talk to).
+2.  **Trigger Bootloader (Optional)**: If the ESC requires a "Break" signal to enter the bootloader:
+    *   Set **Bit 4**: `1` (Force Pin Low).
+    *   `time.sleep(0.25)` in Python.
+    *   Set **Bit 4**: `0` (Release Pin).
 
-1. **Hardware Router monitors the USB UART** for FCSP or 4-Way protocol frames.
-2. The hardware responds to **MSP_BATTERY_STATE** (CMD 130) requests if integrated (or relies on the host FC for MSP responses).
-3. When a **Passthrough Mode** is enabled via a control register (0x020):
-   - The motor pin mux switches to UART mode.
-   - 4-Way binary frames from the PC are forwarded to the ESC at 19200 baud.
-4. ESC responses are captured and returned to the PC.
-5. When complete, the host restores DSHOT mode via the same register.
+### Stage B: Data Tunneling (Stream)
+Once the mux is steered, the hardware provides a direct, low-latency tunnel between your Python code and the motor pin.
+1.  **Send Data**: Package your 4-way protocol or MSP packets into FCSP frames on **Channel 0x05**.
+    *   The hardware router extracts these bytes and feeds them to the UART engine.
+    *   **Overhead**: Zero. You can send up to 512 bytes per FCSP frame.
+2.  **Receive Data**: Responses from the ESC are automatically wrapped into FCSP frames on **Channel 0x05** and sent back to your Python `read()` loop.
 
-### Key Registers (Control Plane)
+### Stage C: Cleanup
+After flashing is complete, restore the system for flight:
+1.  **Restore DShot**: Write to address `0x40000400` with **Bit 0 = 1**.
+2.  **Safety Watchdog**: If the Python process crashes, the hardware will automatically revert to DShot mode after **5 seconds** of inactivity.
 
-| Address       | Register       | Description                                  |
-|---------------|----------------|----------------------------------------------|
-| 0x0000        | DShot Words L  | Motors 0, 1 data                             |
-| 0x0004        | DShot Words H  | Motors 2, 3 data                             |
-| 0x0020        | Mode Register  | `0`: DShot Mode, `1`: Serial Passthrough Mode |
+## 3. Half-Duplex Arbitration
+The hardware UART engine manages the **1-wire half-duplex** timing (standard for BLHeli):
+*   By default, the pin is an **Input** (listening to ESC).
+*   As soon as you send a byte over the `ESC_SERIAL` stream, the hardware automatically flips the pin to **Output**, drives the bits, then flips back to **Input** after a small guard period.
+*   The Python code does not need to manage the "TX Enable" signal; the hardware handles it automatically.
 
-### 4-Way Interface Protocol
+## 4. Baud Rate Selection
+Different ESC protocols or bootloaders may use different speeds.
+*   **Default**: 19200 baud (standard for BLHeli).
+*   **Custom**: Write the desired "Clocks-per-bit" divider to address `0x4000090C`.
+    *   Example for 19200 @ 54MHz: `54000000 / 19200 = 2812`.
 
-Modern configurators wrap commands in the **Betaflight 4-Way Interface Protocol**:
+---
 
-| Byte  | Value  | Name    | Description                 |
-|-------|--------|---------|-----------------------------|
-| 0     | `0x2F` | Sync    | Header (PC → FC)            |
-| 1     | `CMD`  | Command | 4-way command ID            |
-| 2-3   | `ADDR` | Address | Target address              |
-| 4     | `LEN`  | Length  | Length of parameters        |
-| 5..   | `DATA` | Params  | Command parameters          |
-| N-1..N| `CRC`  | CRC16   | CRC16-XMODEM checksum       |
-
-### Bootloader Software UART Timing
-
-The BLHeli bootloader uses **bit-banged (software) UART** at 19200 baud on the motor signal wire.
-
-**Critical Timing:**
-- **Break Signal**: Hold the motor pin LOW for ~100-250ms to trigger bootloader entry.
-- **Send BootInit**: Send 8 zeros + 0x0D + "BLHeli" + CRC16.
-- **Byte Frame Format (19200 8N1)**: 52µs per bit.
-
-## Practical Usage with Pure Hardware Switch
-
-Because the switch is now in hardware, the host script (Python) has precise control over the "Break" timing:
-1. Write `1` to register `0x020` (Enables Passthrough Mode).
-2. Wait 100ms (Hardware holds output at IDLE/HIGH by default or follows the serial stream).
-3. Send the 4-way frames via the ESC_SERIAL channel (0x05).
-
-## Safety Notes
-
-⚠️ **IMPORTANT**:
-- **Remove propellers** before configuring ESCs.
-- **Passthrough mode disables DSHOT**: Motors will not respond during configuration.
-- Restore DSHOT mode (Register `0x020` = `0`) before attempting flight.
+## Why This Implementation is Robust
+1.  **Deterministic Switching**: Because the switch is in RTL (logic gates), the timing of the "Break" signal is accurate to the nanosecond.
+2.  **High Throughput**: Bulk data (Channel 0x05) avoids the overhead of memory-mapped address headers, maximizing USB-UART bandwidth.
+3.  **No CPU Jitter**: Unlike Betaflight, there is no software task scheduling that could cause a serial timeout during a sensitive firmware flash.

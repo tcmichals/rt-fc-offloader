@@ -74,6 +74,11 @@ module fcsp_wishbone_master (
 
     logic [1:0] byte_idx; // Used for multi-byte field extraction
     logic [7:0] wb_byte_offset;
+        // Saved copy of s_cmd_tlast from the last consumed payload byte.
+        // s_cmd_tlast may be de-asserted by the source before the WB operation
+        // completes, so we latch it here for use in ST_WB_READ_EXEC /
+        // ST_WB_WRITE_EXEC.
+        logic cmd_was_last;
 
     always_comb begin
         s_cmd_tready = 1'b0;
@@ -111,7 +116,7 @@ module fcsp_wishbone_master (
             ST_RSP_SEND: begin
                 m_rsp_tvalid = (rsp_idx < rsp_len);
                 m_rsp_tlast  = (rsp_idx + 16'd1 == rsp_len);
-                m_rsp_tdata  = (rsp_idx < 32) ? rsp_buf[rsp_idx] : 8'h00;
+                m_rsp_tdata  = (rsp_idx < 32) ? rsp_buf[rsp_idx[4:0]] : 8'h00;
             end
             default: ;
         endcase
@@ -131,6 +136,7 @@ module fcsp_wishbone_master (
             wb_dat_o <= 32'h0;
             wb_sel_o <= 4'h0;
             wb_byte_offset <= 8'h0;
+                cmd_was_last <= 1'b0;
         end else begin
             unique case (st)
                 ST_IDLE: begin
@@ -203,6 +209,7 @@ module fcsp_wishbone_master (
                                 wb_sel_o <= 4'h0;
                                 st <= ST_WB_WRITE_DATA;
                             end else if (op == OP_READ_BLOCK) begin
+                                    cmd_was_last <= s_cmd_tlast;
                                 st <= ST_WB_READ_EXEC;
                             end
                         end else if (s_cmd_tlast) begin
@@ -227,6 +234,7 @@ module fcsp_wishbone_master (
                         wb_byte_offset <= wb_byte_offset + 8'd1;
                         // Execute cycle if we filled 4 bytes, or reached the end of payload length
                         if (shift == 2'd3 || wb_byte_offset + 8'd1 == len[7:0] || s_cmd_tlast) begin
+                                cmd_was_last <= s_cmd_tlast;
                             st <= ST_WB_WRITE_EXEC;
                         end
                     end
@@ -234,13 +242,13 @@ module fcsp_wishbone_master (
 
                 ST_WB_WRITE_EXEC: begin
                     if (wb_ack_i) begin
-                        if (wb_byte_offset == len[7:0] || s_cmd_tlast) begin
+                            if (wb_byte_offset == len[7:0] || cmd_was_last) begin
                             rsp_buf[0] <= RES_OK;
                             rsp_buf[1] <= len[15:8];
                             rsp_buf[2] <= len[7:0];
                             rsp_len <= 16'd3;
                             rsp_idx <= 16'd0;
-                            st <= s_cmd_tlast ? ST_RSP_SEND : ST_DISCARD_CMD;
+                               st <= cmd_was_last ? ST_RSP_SEND : ST_DISCARD_CMD;
                         end else begin
                             wb_adr_o <= wb_adr_o + 32'd4;
                             wb_dat_o <= 32'h0;
@@ -262,7 +270,7 @@ module fcsp_wishbone_master (
                         rsp_buf[6] <= wb_dat_i[7:0];
                         rsp_len <= 16'd7;
                         rsp_idx <= 16'd0;
-                        st <= s_cmd_tlast ? ST_RSP_SEND : ST_DISCARD_CMD;
+                            st <= cmd_was_last ? ST_RSP_SEND : ST_DISCARD_CMD;
                     end
                 end
 

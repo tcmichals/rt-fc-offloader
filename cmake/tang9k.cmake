@@ -22,12 +22,15 @@ set(TANG9K_SOURCES
     ${CMAKE_SOURCE_DIR}/rtl/fcsp/fcsp_crc_gate.sv
     ${CMAKE_SOURCE_DIR}/rtl/fcsp/fcsp_router.sv
     ${CMAKE_SOURCE_DIR}/rtl/fcsp/fcsp_rx_fifo.sv
-    ${CMAKE_SOURCE_DIR}/rtl/fcsp/fcsp_wishbone_master.sv
+    ${CMAKE_SOURCE_DIR}/rtl/fcsp/fcsp_serv_bridge.sv
+    ${CMAKE_SOURCE_DIR}/rtl/fcsp/fcsp_serv_stub.sv
     ${CMAKE_SOURCE_DIR}/rtl/fcsp/fcsp_tx_fifo.sv
     ${CMAKE_SOURCE_DIR}/rtl/fcsp/fcsp_tx_arbiter.sv
     ${CMAKE_SOURCE_DIR}/rtl/fcsp/fcsp_tx_framer.sv
     ${CMAKE_SOURCE_DIR}/rtl/fcsp/fcsp_uart_byte_stream.sv
     ${CMAKE_SOURCE_DIR}/rtl/fcsp/fcsp_io_engines.sv
+    ${CMAKE_SOURCE_DIR}/rtl/fcsp/fcsp_wishbone_master.sv
+    ${CMAKE_SOURCE_DIR}/rtl/fcsp/drivers/wb_led_controller.sv
 )
 string(JOIN " " TANG9K_SOURCES_STR ${TANG9K_SOURCES})
 set(TANG9K_YOSYS_SCRIPT "read_verilog -sv ${TANG9K_SOURCES_STR}; synth_gowin -top ${TANG9K_TOP} -json ${TANG9K_OUT_DIR}/hardware.json")

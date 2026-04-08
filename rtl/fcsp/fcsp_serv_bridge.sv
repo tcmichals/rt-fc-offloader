@@ -1,11 +1,11 @@
 `default_nettype none
 
-// FCSP <-> SERV control-plane bridge (skeleton)
+// FCSP <-> control-endpoint control-plane bridge (skeleton)
 //
 // Purpose:
 // - accept validated CONTROL payload bytes from FCSP channel FIFO side
-// - emit command stream toward SERV firmware endpoint
-// - accept response stream from SERV endpoint
+// - emit command stream toward control endpoint
+// - accept response stream from control endpoint
 // - emit response payload bytes toward FCSP TX side
 module fcsp_serv_bridge (
     input  logic        clk,
@@ -18,13 +18,13 @@ module fcsp_serv_bridge (
     output logic        s_ctrl_rx_tready,
     input  logic [15:0] s_ctrl_rx_seq,
 
-    // Master AXIS-like SERV command stream (toward firmware endpoint)
+    // Master AXIS-like command stream (toward control endpoint)
     output logic        m_serv_cmd_tvalid,
     output logic [7:0]  m_serv_cmd_tdata,
     output logic        m_serv_cmd_tlast,
     input  logic        m_serv_cmd_tready,
 
-    // Slave AXIS-like SERV response stream (from firmware endpoint)
+    // Slave AXIS-like response stream (from control endpoint)
     input  logic        s_serv_rsp_tvalid,
     input  logic [7:0]  s_serv_rsp_tdata,
     input  logic        s_serv_rsp_tlast,

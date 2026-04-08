@@ -36,10 +36,7 @@ async def _cycle(dut) -> None:
 
 @cocotb.test()
 async def tx_arbiter_strict_priority(dut) -> None:
-    # ARB_POLICY = 0 (Strict)
-    if dut.ARB_POLICY.value != 0:
-        return # Cannot easily change in runtime with cocotb without re-compiling, but default is 0 via Makefile.
-
+    # Current RTL policy is strict priority: CTRL > ESC > DBG.
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await _reset(dut)
 
@@ -92,15 +89,12 @@ async def tx_arbiter_strict_priority(dut) -> None:
 
 
 @cocotb.test()
-async def tx_arbiter_fairness_policy(dut) -> None:
-    # Requires ARB_POLICY = 1 (Round Robin). The Makefile runs this test target with generic parameters.
-    if dut.ARB_POLICY.value != 1:
-        return
-        
+async def tx_arbiter_reselects_ctrl_when_still_valid(dut) -> None:
+    # Verify strict-priority behavior when CTRL remains continuously valid.
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await _reset(dut)
 
-    # Set all valid. First select will be CTRL.
+    # Set all valid. First selection should be CTRL.
     dut.s_ctrl_tvalid.value = 1
     dut.s_esc_tvalid.value = 1
     dut.s_dbg_tvalid.value = 1
@@ -115,24 +109,24 @@ async def tx_arbiter_fairness_policy(dut) -> None:
     dut.s_ctrl_tlast.value = 0
     
     await _cycle(dut)
-    # With ARB_POLICY=1, the next pick should be ESC even if CTRL tvalid stays high!
-    assert int(dut.m_channel.value) == 0x02, f"Expected ESC round-robin pick, got {int(dut.m_channel.value)}"
-    
-    # Finish ESC
+    # With strict priority, arbiter should reselect CTRL while it remains valid.
+    assert int(dut.m_channel.value) == 0x01, f"Expected CTRL reselection, got {int(dut.m_channel.value)}"
+    assert bool(dut.s_ctrl_tready.value), "CTRL stream should remain selected"
+
+    # End the reselected CTRL frame; arbiter releases grant only on tlast handshake.
+    dut.s_ctrl_tlast.value = 1
+    await _cycle(dut)
+    dut.s_ctrl_tlast.value = 0
+    dut.s_ctrl_tvalid.value = 0
+
+    await _cycle(dut)
+    assert int(dut.m_channel.value) == 0x02, f"Expected ESC after CTRL deasserts, got {int(dut.m_channel.value)}"
+
     dut.s_esc_tlast.value = 1
     await _cycle(dut)
     dut.s_esc_tlast.value = 0
-    
-    await _cycle(dut)
-    # Next pick should be DBG
-    assert int(dut.m_channel.value) == 0x03, "Expected DBG round-robin pick"
+    dut.s_esc_tvalid.value = 0
 
-    # Finish DBG
-    dut.s_dbg_tlast.value = 1
     await _cycle(dut)
-    dut.s_dbg_tlast.value = 0
-    
-    await _cycle(dut)
-    # Back to CTRL!
-    assert int(dut.m_channel.value) == 0x01, "Expected loopback to CTRL"
+    assert int(dut.m_channel.value) == 0x03, f"Expected DBG after ESC finishes, got {int(dut.m_channel.value)}"
 

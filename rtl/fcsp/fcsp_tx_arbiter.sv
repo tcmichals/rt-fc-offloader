@@ -9,9 +9,7 @@
 //   - DEBUG stream is selected when CONTROL and ESC_SERIAL are idle
 // Grant is held until the selected frame's tlast handshake to preserve frame
 // atomicity for downstream metadata/framing.
-module fcsp_tx_arbiter #(
-    parameter int ARB_POLICY = 0 // 0: Strict Priority, 1: Round-Robin
-) (
+module fcsp_tx_arbiter (
     input  logic        clk,
     input  logic        rst,
 
@@ -59,7 +57,6 @@ module fcsp_tx_arbiter #(
     } sel_t;
 
     sel_t sel;
-    sel_t last_sel;
 
     always_comb begin
         s_ctrl_tready = 1'b0;
@@ -112,55 +109,34 @@ module fcsp_tx_arbiter #(
     always_ff @(posedge clk) begin
         if (rst) begin
             sel <= SEL_NONE;
-            last_sel <= SEL_NONE;
         end else begin
             unique case (sel)
                 SEL_NONE: begin
-                    if (ARB_POLICY == 0) begin
-                        // Strict priority while idle.
-                        if (s_ctrl_tvalid) begin
-                            sel <= SEL_CTRL;
-                        end else if (s_esc_tvalid) begin
-                            sel <= SEL_ESC;
-                        end else if (s_dbg_tvalid) begin
-                            sel <= SEL_DBG;
-                        end
-                    end else begin
-                        // Round-robin fairness
-                        if (last_sel == SEL_CTRL) begin
-                            if (s_esc_tvalid) sel <= SEL_ESC;
-                            else if (s_dbg_tvalid) sel <= SEL_DBG;
-                            else if (s_ctrl_tvalid) sel <= SEL_CTRL;
-                        end else if (last_sel == SEL_ESC) begin
-                            if (s_dbg_tvalid) sel <= SEL_DBG;
-                            else if (s_ctrl_tvalid) sel <= SEL_CTRL;
-                            else if (s_esc_tvalid) sel <= SEL_ESC;
-                        end else begin // last_sel == SEL_DBG or SEL_NONE
-                            if (s_ctrl_tvalid) sel <= SEL_CTRL;
-                            else if (s_esc_tvalid) sel <= SEL_ESC;
-                            else if (s_dbg_tvalid) sel <= SEL_DBG;
-                        end
+                    // Strict priority while idle.
+                    if (s_ctrl_tvalid) begin
+                        sel <= SEL_CTRL;
+                    end else if (s_esc_tvalid) begin
+                        sel <= SEL_ESC;
+                    end else if (s_dbg_tvalid) begin
+                        sel <= SEL_DBG;
                     end
                 end
 
                 SEL_CTRL: begin
                     if (s_ctrl_tvalid && m_tready && s_ctrl_tlast) begin
                         sel <= SEL_NONE;
-                        last_sel <= SEL_CTRL;
                     end
                 end
 
                 SEL_DBG: begin
                     if (s_dbg_tvalid && m_tready && s_dbg_tlast) begin
                         sel <= SEL_NONE;
-                        last_sel <= SEL_DBG;
                     end
                 end
 
                 SEL_ESC: begin
                     if (s_esc_tvalid && m_tready && s_esc_tlast) begin
                         sel <= SEL_NONE;
-                        last_sel <= SEL_ESC;
                     end
                 end
 

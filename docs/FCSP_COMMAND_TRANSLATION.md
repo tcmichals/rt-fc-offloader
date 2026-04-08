@@ -98,7 +98,7 @@ flowchart LR
 
 - Machine-readable map: `protocol/fcsp_command_map.json`
 - Python adapter: `sim/python_fcsp/command_adapter.py`
-- C++ scaffold: `firmware/serv8/fcsp_command_adapter.hpp`
+- C++ scaffold: `firmware/serv8/fcsp_command_adapter.hpp` *(legacy folder name; does not imply active embedded soft-CPU usage)*
 
 ## Why intent-based mapping
 

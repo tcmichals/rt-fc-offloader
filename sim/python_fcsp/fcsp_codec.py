@@ -138,6 +138,35 @@ def build_control_payload(op_id: int, data: bytes = b"") -> bytes:
     return bytes([op_id & 0xFF]) + (data or b"")
 
 
+def build_write_block_payload(*, space: int = 0x01, address: int, data: bytes) -> bytes:
+    if not (0 <= space <= 0xFF):
+        raise ValueError("space out of range")
+    if not (0 <= address <= 0xFFFFFFFF):
+        raise ValueError("address out of range")
+    if len(data) > 0xFFFF:
+        raise ValueError("data too long")
+    return (
+        bytes([ControlOp.WRITE_BLOCK, space])
+        + address.to_bytes(4, "big")
+        + len(data).to_bytes(2, "big")
+        + data
+    )
+
+
+def build_read_block_payload(*, space: int = 0x01, address: int, length: int) -> bytes:
+    if not (0 <= space <= 0xFF):
+        raise ValueError("space out of range")
+    if not (0 <= address <= 0xFFFFFFFF):
+        raise ValueError("address out of range")
+    if not (0 <= length <= 0xFFFF):
+        raise ValueError("length out of range")
+    return (
+        bytes([ControlOp.READ_BLOCK, space])
+        + address.to_bytes(4, "big")
+        + length.to_bytes(2, "big")
+    )
+
+
 def parse_control_payload(payload: bytes) -> tuple[int, bytes]:
     if not payload:
         raise ValueError("control payload empty")

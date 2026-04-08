@@ -1,0 +1,83 @@
+"""Common register constants and bitfield helpers for hardware scripts."""
+
+from __future__ import annotations
+
+# ---------------------------------------------------------------------------
+# Identity
+# ---------------------------------------------------------------------------
+WHO_AM_I          = 0x40000000
+EXPECTED_WHO_AM_I = 0xFC500002
+
+# ---------------------------------------------------------------------------
+# DShot mailbox  (base 0x40000300)
+# Raw registers:  write a full 16-bit DSHOT word (throttle[15:5] telem[4] CRC[3:0])
+# Smart/THR regs: write 11-bit throttle + 1-bit telemetry, hardware fills CRC
+# Status/Config:  read ready bits, write DSHOT speed (150/300/600)
+# ---------------------------------------------------------------------------
+DSHOT_BASE        = 0x40000300
+
+DSHOT_MOTOR1_RAW  = DSHOT_BASE + 0x00   # raw 16-bit DSHOT word, motor 1
+DSHOT_MOTOR2_RAW  = DSHOT_BASE + 0x04
+DSHOT_MOTOR3_RAW  = DSHOT_BASE + 0x08
+DSHOT_MOTOR4_RAW  = DSHOT_BASE + 0x0C
+DSHOT_STATUS      = DSHOT_BASE + 0x10   # [3:0] ready bits
+DSHOT_CONFIG      = DSHOT_BASE + 0x14   # [15:0] speed: 150/300/600
+
+DSHOT_MOTOR1_THR  = DSHOT_BASE + 0x40   # 11-bit throttle + 1-bit telem, CRC auto
+DSHOT_MOTOR2_THR  = DSHOT_BASE + 0x44
+DSHOT_MOTOR3_THR  = DSHOT_BASE + 0x48
+DSHOT_MOTOR4_THR  = DSHOT_BASE + 0x4C
+
+# Convenience list indexed 0..3
+DSHOT_MOTOR_THR   = (DSHOT_MOTOR1_THR, DSHOT_MOTOR2_THR, DSHOT_MOTOR3_THR, DSHOT_MOTOR4_THR)
+DSHOT_MOTOR_RAW   = (DSHOT_MOTOR1_RAW, DSHOT_MOTOR2_RAW, DSHOT_MOTOR3_RAW, DSHOT_MOTOR4_RAW)
+
+# ---------------------------------------------------------------------------
+# Serial/DSHOT mux  (base 0x40000400)
+# ---------------------------------------------------------------------------
+MUX_CTRL   = 0x40000400
+MODE_SERIAL = 0  # bit[0]=0 => serial/passthrough
+MODE_DSHOT  = 1  # bit[0]=1 => dshot
+
+# ---------------------------------------------------------------------------
+# NeoPixel  (base 0x40000600)
+# ---------------------------------------------------------------------------
+NEO_PIXEL_0 = 0x40000600
+NEO_UPDATE  = 0x40000620
+
+# ---------------------------------------------------------------------------
+# On-board LED controller  (base 0x40000C00)
+# Registers: LED_OUT (+0x00), LED_TOGGLE (+0x04), LED_CLEAR (+0x08), LED_SET (+0x0C)
+# Bits [3:0] map to board LEDs 3-6 (active-low on Tang Nano 9K)
+# ---------------------------------------------------------------------------
+LED_BASE    = 0x40000C00
+LED_OUT     = LED_BASE + 0x00   # RW: current output value
+LED_TOGGLE  = LED_BASE + 0x04   # W:  XOR bits into output
+LED_CLEAR   = LED_BASE + 0x08   # W:  AND-NOT bits into output
+LED_SET     = LED_BASE + 0x0C   # W:  OR bits into output
+
+LED_0 = 0x1   # board o_led_3
+LED_1 = 0x2   # board o_led_4
+LED_2 = 0x4   # board o_led_5
+LED_3 = 0x8   # board o_led_6
+LED_ALL = 0xF
+
+
+def rgbw(r: int, g: int, b: int, w: int = 0) -> int:
+    """Pack into 32-bit SK6812 RGBW word (MSB-first: R[31:24] G[23:16] B[15:8] W[7:0])."""
+    return (r << 24) | (g << 16) | (b << 8) | w
+
+
+def make_mux_word(mode: int, channel: int, msp_mode: int = 0, force_low: int = 0) -> int:
+    """Build wb_serial_dshot_mux control word bits [4:0]."""
+    return ((force_low & 0x1) << 4) | ((msp_mode & 0x1) << 3) | ((channel & 0x3) << 1) | (mode & 0x1)
+
+
+def decode_mux_word(word: int) -> dict[str, int]:
+    """Decode wb_serial_dshot_mux control word bits [4:0]."""
+    return {
+        "mode": word & 0x1,
+        "channel": (word >> 1) & 0x3,
+        "msp_mode": (word >> 3) & 0x1,
+        "force_low": (word >> 4) & 0x1,
+    }
