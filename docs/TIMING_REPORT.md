@@ -115,32 +115,32 @@ The **Pure Hardware Switch** currently meets the documented timing targets for t
 <!-- AUTO_COMPILE_SUMMARY_START -->
 ## Auto-updated Compile Snapshot
 
-Generated: 2026-04-09 00:27:57Z
+Generated: 2026-04-09 01:37:28Z
 
 Source log: `/media/tcmichals/projects/pico/flightcontroller/rt-fc-offloader/build/tang9k_oss/nextpnr.log`
 
 ### Timing
 
 - Constraint (`sys_clk`): **54.00 MHz**
-- Post-route FMAX (`sys_clk`): **76.13 MHz**
-- Margin vs target: **22.13 MHz**
-- Early analytical estimate (pre-route): **81.83 MHz**
+- Post-route FMAX (`sys_clk`): **80.59 MHz**
+- Margin vs target: **26.59 MHz**
+- Early analytical estimate (pre-route): **85.15 MHz**
 
 ### Utilization
 
 | Resource | Used / Avail | Utilization |
 |---|---:|---:|
 | IOB | 24 / 276 | 8% |
-| LUT4 | 6748 / 8640 | 78% |
-| DFF | 3376 / 6480 | 52% |
+| LUT4 | 6778 / 8640 | 78% |
+| DFF | 3384 / 6480 | 52% |
 | RAM16SDP4 | 146 / 270 | 54% |
 | BSRAM | 7 / 26 | 26% |
 | rPLL | 1 / 2 | 50% |
 
 ### Current Worst Path Snapshot (`sys_clk`)
 
-- Source: `u_top.u_crc_gate.frame_payload_len_reg_DFFRE_Q_12.Q`
-- Sink: `u_top.u_crc_gate.u_crc16.o_crc_ok_LUT2_I0_F_LUT4_I3_F_LUT4_I3_F_LUT3_F_I1_LUT2_F_I1_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM_LUT3_I1_F_ALU_SUM_CIN_ALU_COUT_SUM_ALU_SUM_COUT_ALU_CIN_SUM_ALU_SUM_CIN_ALU_COUT.I0`
-- Logic delay: **5.63 ns**
-- Routing delay: **7.50 ns**
+- Source: `u_top.u_io_engines.u_dshot.dshot_mode_reg_DFFRE_Q_6.Q`
+- Sink: `u_top.u_io_engines.u_dshot.u_motor4.ready_reg_DFFSE_Q_D_LUT2_F_I0_LUT2_I1_F_LUT4_F_1_I3_LUT4_F.I1`
+- Logic delay: **5.32 ns**
+- Routing delay: **7.09 ns**
 <!-- AUTO_COMPILE_SUMMARY_END -->

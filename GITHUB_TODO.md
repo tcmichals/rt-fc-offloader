@@ -34,14 +34,16 @@
 ## Simulation
 
 - [x] Add frame parser noise-resync tests — 3 new tests (embedded sync, truncated frame, back-to-back)
-- [ ] Add caps paging tests
-- [ ] Add passthrough safety transition tests
+- [x] Add caps paging tests — GET_CAPS E2E + unknown opcode RES_NOT_SUPPORTED E2E
+- [x] Add passthrough safety transition tests — force_low hold/release, DShot↔serial round-trip, 4-channel sweep
 - [ ] Compare `wb_neoPx` / `sendPx_axis_flexible` timing approach against external RTL NeoPixel reference projects (capture deltas + recommended updates)
-- [x] Add E2E mux switching tests — 3 tests (read default, switch to serial, toggle back)
+- [x] Add E2E mux switching tests — 6 tests (read default, switch to serial, toggle back, force_low, round-trip, channel sweep)
 - [x] Add E2E LED controller tests — 4 tests (set/readback, clear, toggle, walk pattern)
 - [x] Add E2E NeoPixel write+trigger tests — 2 tests (single pixel, multi pixel)
 - [x] Add E2E BLHeli boot sequence tests — 2 tests (force low/release, ESC data after boot)
 - [x] Add E2E SPI TX egress tests — 2 tests (PING mirror, CS-high passthrough)
+- [x] Add ESC protocol test suite — 5 tests (BLHeli 4-way framing, multi-byte, baud config, channel switch)
+- [x] Add ESC traffic generator — `sim/cocotb/esc_traffic_gen.py` with BLHeli 4-way helpers + simulator class
 
 ## 50 MHz control-path target checks
 
@@ -111,8 +113,8 @@ Goal: close all remaining SystemVerilog implementation gaps for a production-com
 - [ ] Add top-level debug/telemetry channel sources
 - [x] Tie board wrapper to production top signals
 - [ ] Close CDC/reset/timing hardening gaps
-- [x] Create cocotb for each new block — 103 cocotb tests across 22 suites
-- [x] Run strict regression and timing gates — 103 tests, 0 failures
+- [x] Create cocotb for each new block — 113 cocotb tests across 23 suites
+- [x] Run strict regression and timing gates — 113 tests, 0 failures
 
 ## RTL Bugs Fixed (Apr 2026)
 
@@ -218,7 +220,7 @@ and verified with a dedicated cocotb block-level testbench before integration.
 - [x] **M4**: IP-3 (PWM Decoder) ported and block-tested → RC input readable via Wishbone
 - [x] **M5**: IP-6 (WB bus + WB master integration) complete → `fcsp_wishbone_master` is active control path
 - [ ] **M6**: All blocks integrated in `fcsp_tangnano9k_top` → `tang9k-build` passes timing
-- [x] **M7**: `make test-all-strict` passes → 103 cocotb tests across 22 suites, 0 failures
+- [x] **M7**: `make test-all-strict` passes → 113 cocotb tests across 23 suites, 0 failures
 - [ ] **M8**: All E2E Python hardware tests pass in simulation (`python/hw/test_hw_*.py --port sim`)
 
 ---
@@ -323,39 +325,31 @@ Legacy porting left duplicate RTL and dead firmware trees in the repo. These inf
 
 ### Dead firmware
 
-- [ ] Remove `firmware/serv8/` — SERV CPU path was replaced by `fcsp_wishbone_master` (pure-RTL control plane). No firmware runs on this target.
+- [x] Remove `firmware/serv8/` — SERV CPU path was replaced by `fcsp_wishbone_master` (pure-RTL control plane). No firmware runs on this target.
 
 ### Duplicate RTL (legacy `rtl/fcsp/drivers/` vs ported `rtl/io/`)
 
 Every file below exists as both a legacy copy under `rtl/fcsp/drivers/` and the production copy under `rtl/io/`. Only the `rtl/io/` versions are used in the build. Delete the legacy duplicates:
 
-- [ ] `rtl/fcsp/drivers/dshot/dshot_out.sv` (ported → `rtl/io/dshot_out.sv`)
-- [ ] `rtl/fcsp/drivers/dshot/wb_dshot_controller.sv` (ported → `rtl/io/wb_dshot_controller.sv`)
-- [ ] `rtl/fcsp/drivers/dshot/motor_mailbox_sv.sv` (not used in production)
-- [ ] `rtl/fcsp/drivers/dshot/wb_dshot_mailbox.sv` (not used in production)
-- [ ] `rtl/fcsp/drivers/neoPXStrip/wb_neoPx.sv` (ported → `rtl/io/wb_neoPx.sv`)
-- [ ] `rtl/fcsp/drivers/neoPXStrip/sendPx_axis_flexible.sv` (ported → `rtl/io/sendPx_axis_flexible.sv`)
-- [ ] `rtl/fcsp/drivers/pwmDecoder/pwmdecoder.sv` (ported → `rtl/io/pwmdecoder.sv`)
-- [ ] `rtl/fcsp/drivers/pwmDecoder/pwmdecoder_wb.sv` (ported → `rtl/io/pwmdecoder_wb.sv`)
-- [ ] `rtl/fcsp/drivers/uart/wb_esc_uart.sv` (ported → `rtl/io/wb_esc_uart.sv`)
-- [ ] `rtl/fcsp/drivers/uart/uart_rx.sv` (standalone; not used in production)
-- [ ] `rtl/fcsp/drivers/uart/uart_tx.sv` (standalone; not used in production)
-- [ ] `rtl/fcsp/drivers/uart/wb_usb_uart.sv` (not used in production)
-- [ ] `rtl/fcsp/drivers/wb_serial_dshot_mux.sv` (ported → `rtl/io/wb_serial_dshot_mux.sv`)
+- [x] `rtl/fcsp/drivers/dshot/` (all files — ported → `rtl/io/`)
+- [x] `rtl/fcsp/drivers/neoPXStrip/` (all files — ported → `rtl/io/`)
+- [x] `rtl/fcsp/drivers/pwmDecoder/` (all files — ported → `rtl/io/`)
+- [x] `rtl/fcsp/drivers/uart/` (all files — ported → `rtl/io/`)
+- [x] `rtl/fcsp/drivers/wb_serial_dshot_mux.sv` (ported → `rtl/io/wb_serial_dshot_mux.sv`)
 
 ### Dead RTL modules (replaced by architecture changes)
 
-- [ ] `rtl/fcsp/fcsp_serv_bridge.sv` — replaced by `fcsp_wishbone_master`
-- [ ] `rtl/fcsp/fcsp_serv_stub.sv` — interim stub, no longer used
+- [x] `rtl/fcsp/fcsp_serv_bridge.sv` — replaced by `fcsp_wishbone_master`
+- [x] `rtl/fcsp/fcsp_serv_stub.sv` — interim stub, no longer used
 
 ### Other legacy drivers (assess & remove)
 
-- [ ] `rtl/fcsp/drivers/wb_timer.sv` — not instantiated anywhere in production
-- [ ] `rtl/fcsp/drivers/wb_ila.sv` — not instantiated anywhere in production
-- [ ] `rtl/fcsp/drivers/wb_spisystem.sv` — legacy SPI system, replaced by `fcsp_spi_frontend`
-- [ ] `rtl/fcsp/drivers/wb_debug_gpio.sv` — not instantiated anywhere in production
-- [ ] `rtl/fcsp/drivers/wb_mux_6.sv` — legacy 6-port mux, replaced by `wb_io_bus`
-- [ ] `rtl/fcsp/drivers/version/wb_version.sv` — not instantiated; WHO_AM_I is in `wb_io_bus`
+- [x] `rtl/fcsp/drivers/wb_timer.sv` — removed
+- [x] `rtl/fcsp/drivers/wb_ila.sv` — removed
+- [x] `rtl/fcsp/drivers/wb_spisystem.sv` — removed
+- [x] `rtl/fcsp/drivers/wb_debug_gpio.sv` — removed
+- [x] `rtl/fcsp/drivers/wb_mux_6.sv` — removed
+- [x] `rtl/fcsp/drivers/version/wb_version.sv` — removed
 
 ---
 
@@ -388,22 +382,22 @@ Goal: every feature that ships in the FPGA bitstream is verified in simulation (
 - [x] **FCSP CH 0x05 routing**: send FCSP CH 0x05 frame → verify router ESC stream fires, not control path
 - [x] **FCSP CH 0x05 reaches UART TX**: send CH 0x05 frame → verify `o_esc_tx_active` fires
 - [x] **FCSP CH 0x05 full roundtrip**: send CH 0x05 frame → UART TX → verify TX active fires and completes — `test_e2e_esc_roundtrip_cocotb.py`, 3 tests
-- [ ] **BLHeli boot sequence E2E**: mux=serial → force_low → release → CH 0x05 data → verify UART TX on motor pad
-- [ ] **SPI TX egress**: send FCSP CONTROL frame via SPI ingress → verify response exits on SPI MISO (once SPI TX is enabled)
+- [x] **BLHeli boot sequence E2E**: mux=serial → force_low → release → CH 0x05 data → verify UART TX on motor pad — `test_e2e_blheli_boot_cocotb.py`
+- [x] **SPI TX egress**: send FCSP CONTROL frame via SPI ingress → verify response exits on SPI MISO — `test_e2e_spi_tx_cocotb.py`
 
 ### ESC traffic generator (Python cocotb helper)
 
-- [ ] Create `sim/cocotb/esc_traffic_gen.py`: reusable ESC simulator that:
-  - Drives serial bytes into `pad_motor[N]` (simulating ESC responses)
-  - Validates BLHeli 4-way protocol framing
-  - Supports configurable baud rate (19200 default)
-  - Supports programmable response delay (simulating real ESC timing)
-- [ ] Create `sim/cocotb/test_esc_protocol_cocotb.py`: full ESC protocol test using the traffic generator:
-  - [ ] Send BLHeli init sequence via FCSP CH 0x05 → verify ESC sees correct bytes on motor pin
-  - [ ] ESC simulator responds → verify host receives FCSP CH 0x05 response frame
-  - [ ] Multi-byte exchange: send 16-byte command → receive 32-byte response → verify integrity
-  - [ ] Baud rate change: write new BAUD_DIV → verify subsequent exchange uses new timing
-  - [ ] Channel switch: reconfigure mux to different motor → verify correct pad is driven
+- [x] Create `sim/cocotb/esc_traffic_gen.py`: reusable ESC simulator with:
+  - UART byte-level bit-bang drivers and capture helpers
+  - BLHeli 4-way frame build/decode (command + response + CRC)
+  - `EscSimulator` class for automated response generation
+  - Configurable baud rate and response delay
+- [x] Create `sim/cocotb/test_esc_protocol_cocotb.py`: ESC protocol tests (5 tests):
+  - [x] BLHeli GET_NAME command reaches UART TX with correct byte count
+  - [x] Multi-byte INIT_FLASH command transmits all bytes
+  - [x] BAUD_DIV register read/write configuration
+  - [x] Channel switch (motor 0 → motor 1) with TX verification
+  - [x] BLHeli 4-way frame build/decode round-trip validation
 
 ### Python hardware test scripts (USB-serial, `python/hw/`)
 
@@ -433,11 +427,8 @@ New scripts needed:
 ### Remaining open items summary (Apr 8, 2026)
 
 - [ ] Enable SPI TX egress (`spi_tx_valid` still tied off)
-- [ ] ESC traffic generator (`sim/cocotb/esc_traffic_gen.py`)
-- [ ] ESC protocol full roundtrip test (CH 0x05 → UART TX → loopback → RX → response frame)
-- [ ] Stream packetizer dedicated block test
 - [ ] 4 new Python HW scripts: `test_hw_dshot_status.py`, `test_hw_pwm_readback.py`, `test_hw_esc_uart_loopback.py`, `test_hw_register_sweep.py`
-- [ ] Repository cleanup: `firmware/serv8/`, 13 legacy RTL duplicates, 2 dead modules
+- ~~Repository cleanup: `firmware/serv8/`, 13 legacy RTL duplicates, 2 dead modules~~ ✅ Done
 - [ ] CDC/reset/timing hardening
 - [ ] Backpressure/overflow counters
 - [ ] **DESIGN.md gaps section** shows zero blocking gaps (G1–G4 resolved)

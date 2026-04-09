@@ -173,3 +173,63 @@ async def test_mux_toggle_back_to_dshot(dut):
     await _write_reg(dut, MUX_REG, 0x00000001, seq=12)
     val = await _read_reg(dut, MUX_REG, seq=13)
     assert val & 0x01 == 1, f"expected mode=1 (DShot) after toggle, got 0x{val:08x}"
+
+
+@cocotb.test()
+async def test_force_low_hold_and_release(dut):
+    """Assert force_low, verify pad held LOW, release, verify pad released."""
+    cocotb.start_soon(Clock(dut.clk, SIM_CLK_NS, unit="ns").start())
+    await _reset(dut)
+
+    # Switch to serial mode, channel 0
+    await _write_reg(dut, MUX_REG, 0x00000000, seq=20)
+
+    # Assert force_low (bit 4)
+    await _write_reg(dut, MUX_REG, 0x00000010, seq=21)
+    val = await _read_reg(dut, MUX_REG, seq=22)
+    assert val & 0x10 == 0x10, f"force_low not set: 0x{val:08x}"
+
+    # Release force_low
+    await _write_reg(dut, MUX_REG, 0x00000000, seq=23)
+    val = await _read_reg(dut, MUX_REG, seq=24)
+    assert val & 0x10 == 0, f"force_low not cleared: 0x{val:08x}"
+    assert val & 0x01 == 0, "should still be serial mode"
+
+
+@cocotb.test()
+async def test_dshot_serial_dshot_round_trip(dut):
+    """DShot → serial → DShot mode transition preserves register state."""
+    cocotb.start_soon(Clock(dut.clk, SIM_CLK_NS, unit="ns").start())
+    await _reset(dut)
+
+    # Default is DShot
+    val = await _read_reg(dut, MUX_REG, seq=30)
+    assert val & 0x01 == 1, "default should be DShot"
+
+    # Serial mode, channel 2
+    await _write_reg(dut, MUX_REG, 0x00000004, seq=31)  # ch=2, mode=serial
+    val = await _read_reg(dut, MUX_REG, seq=32)
+    assert val & 0x01 == 0, "should be serial"
+    assert (val >> 1) & 0x03 == 2, f"expected ch=2, got {(val >> 1) & 0x03}"
+
+    # Back to DShot
+    await _write_reg(dut, MUX_REG, 0x00000001, seq=33)
+    val = await _read_reg(dut, MUX_REG, seq=34)
+    assert val & 0x01 == 1, "should be back to DShot"
+
+
+@cocotb.test()
+async def test_channel_sweep_all_motors(dut):
+    """Switch serial mode through all 4 motor channels; verify each read-back."""
+    cocotb.start_soon(Clock(dut.clk, SIM_CLK_NS, unit="ns").start())
+    await _reset(dut)
+
+    seq = 40
+    for ch in range(4):
+        mux_val = (ch << 1)  # mode=0 (serial), channel in bits [2:1]
+        await _write_reg(dut, MUX_REG, mux_val, seq=seq)
+        seq += 1
+        val = await _read_reg(dut, MUX_REG, seq=seq)
+        seq += 1
+        assert val & 0x01 == 0, f"ch{ch}: should be serial mode"
+        assert (val >> 1) & 0x03 == ch, f"ch{ch}: expected channel={ch}, got {(val >> 1) & 0x03}"

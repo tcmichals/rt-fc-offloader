@@ -188,3 +188,40 @@ async def test_two_sequential_reads(dut):
     raw2 = await with_timeout(collector2, 200, "us")
     rsp2 = _try_decode_first_frame(raw2)
     assert rsp2 is not None, f"Second read: no response in {raw2.hex()}"
+
+
+@cocotb.test()
+async def test_get_caps_e2e(dut):
+    """E2E: GET_CAPS (0x12) returns RES_OK through the full frame path."""
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await _reset(dut)
+
+    cmd_payload = build_control_payload(0x12)  # OP_GET_CAPS
+    frame = encode_frame(flags=0, channel=0x01, seq=0x20, payload=cmd_payload)
+
+    collector = cocotb.start_soon(_collect_usb_tx_bytes(dut, max_bytes=20, max_cycles=3000))
+    await with_timeout(_drive_usb_bytes(dut, frame), 100, "us")
+    raw_tx = await with_timeout(collector, 200, "us")
+
+    rsp_frame = _try_decode_first_frame(raw_tx)
+    assert rsp_frame is not None, f"Could not decode GET_CAPS response from {raw_tx.hex()}"
+    assert rsp_frame.payload[0] == 0x00, f"Expected RES_OK, got 0x{rsp_frame.payload[0]:02x}"
+
+
+@cocotb.test()
+async def test_unknown_opcode_e2e(dut):
+    """E2E: Unknown single-byte opcode returns RES_NOT_SUPPORTED (0x04)."""
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await _reset(dut)
+
+    cmd_payload = build_control_payload(0xFF)  # Unknown opcode
+    frame = encode_frame(flags=0, channel=0x01, seq=0x30, payload=cmd_payload)
+
+    collector = cocotb.start_soon(_collect_usb_tx_bytes(dut, max_bytes=20, max_cycles=3000))
+    await with_timeout(_drive_usb_bytes(dut, frame), 100, "us")
+    raw_tx = await with_timeout(collector, 200, "us")
+
+    rsp_frame = _try_decode_first_frame(raw_tx)
+    assert rsp_frame is not None, f"Could not decode response from {raw_tx.hex()}"
+    assert rsp_frame.payload[0] == 0x04, \
+        f"Expected RES_NOT_SUPPORTED (0x04), got 0x{rsp_frame.payload[0]:02x}"
