@@ -355,10 +355,12 @@ module fcsp_tangnano9k_top (
     assign o_led_1 = ~heartbeat_led_on;
     assign o_led_2 = ~spi_led_on;
     // LEDs 3-6: register-controlled via wb_led_controller (active-low)
-    assign o_led_3 = ~led_reg_out[0];
-    assign o_led_4 = ~led_reg_out[1];
-    assign o_led_5 = ~led_reg_out[2];
-    assign o_led_6 = ~led_reg_out[3];
+    // wb_led_controller with LED_POLARITY=0 already inverts for active-low;
+    // pass through directly — no second inversion here.
+    assign o_led_3 = led_reg_out[0];
+    assign o_led_4 = led_reg_out[1];
+    assign o_led_5 = led_reg_out[2];
+    assign o_led_6 = led_reg_out[3];
 
     assign o_debug_0 = debug_leds_internal[0];
     assign o_debug_1 = debug_leds_internal[1];

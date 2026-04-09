@@ -208,5 +208,85 @@ async def parser_handles_random_backpressure_without_data_loss(dut) -> None:
     assert bytes(captured_payload) == payload, (
         f"payload mismatch under backpressure: expected {payload!r}, got {bytes(captured_payload)!r}"
     )
+
+
+@cocotb.test()
+async def parser_resyncs_after_embedded_sync_in_noise(dut) -> None:
+    """A bogus header with len>512 triggers len_error; parser resyncs to next frame."""
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await _reset(dut)
+
+    frame = encode_frame(flags=0, channel=0x01, seq=3, payload=b"hi")
+    # Bogus header: valid sync + version but payload_len=513 → triggers len_error.
+    # Parser should discard this and resync to the next sync byte.
+    bogus_header = bytes([0xA5, 0x01, 0x00, 0x00, 0x00, 0x00, 0x02, 0x01])
+    stream = bogus_header + frame
+
+    done_count = 0
+    saw_len_error = False
+    for b in stream:
+        _s_sync, _s_hdr, s_done, _p_len, _body_rem = await _drive_and_sample(dut, b)
+        if s_done:
+            done_count += 1
+        if bool(dut.o_len_error.value):
+            saw_len_error = True
+
+    dut.in_valid.value = 0
+    await RisingEdge(dut.clk)
+    await ReadOnly()
+    await NextTimeStep()
+    assert saw_len_error, "expected len_error from bogus header"
+    assert done_count == 1, f"expected exactly 1 frame_done after resync, got {done_count}"
+
+
+@cocotb.test()
+async def parser_resyncs_after_truncated_frame(dut) -> None:
+    """Truncated header followed by a valid frame still completes."""
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await _reset(dut)
+
+    valid_frame = encode_frame(flags=0, channel=0x01, seq=4, payload=b"ab")
+    # Sync + partial header (version + flags + channel) — no seq or payload_len
+    truncated = bytes([0xA5, 0x01, 0x00, 0x01])
+    stream = truncated + valid_frame
+
+    saw_done = False
+    for b in stream:
+        _s_sync, _s_hdr, s_done, _p_len, _body_rem = await _drive_and_sample(dut, b)
+        saw_done |= s_done
+
+    dut.in_valid.value = 0
+    await RisingEdge(dut.clk)
+    await ReadOnly()
+    await NextTimeStep()
+    assert saw_done, "expected parser to resync and complete the second frame"
+
+
+@cocotb.test()
+async def parser_completes_back_to_back_frames(dut) -> None:
+    """Two frames transmitted with no gap bytes should both complete."""
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await _reset(dut)
+
+    frame1 = encode_frame(flags=0, channel=0x01, seq=5, payload=b"A")
+    frame2 = encode_frame(flags=0, channel=0x02, seq=6, payload=b"B")
+    stream = frame1 + frame2
+
+    done_count = 0
+    for b in stream:
+        _s_sync, _s_hdr, s_done, _p_len, _body_rem = await _drive_and_sample(dut, b)
+        if s_done:
+            done_count += 1
+
+    # Drain a few extra cycles for a late frame_done pulse
+    for _ in range(5):
+        dut.in_valid.value = 0
+        await RisingEdge(dut.clk)
+        await ReadOnly()
+        if bool(dut.o_frame_done.value):
+            done_count += 1
+        await NextTimeStep()
+
+    assert done_count == 2, f"expected 2 frame_done pulses, got {done_count}"
     assert int(dut.o_len_error.value) == 0, "len_error should remain low for valid frame"
 

@@ -33,10 +33,15 @@
 
 ## Simulation
 
-- [ ] Add frame parser noise-resync tests
+- [x] Add frame parser noise-resync tests — 3 new tests (embedded sync, truncated frame, back-to-back)
 - [ ] Add caps paging tests
 - [ ] Add passthrough safety transition tests
 - [ ] Compare `wb_neoPx` / `sendPx_axis_flexible` timing approach against external RTL NeoPixel reference projects (capture deltas + recommended updates)
+- [x] Add E2E mux switching tests — 3 tests (read default, switch to serial, toggle back)
+- [x] Add E2E LED controller tests — 4 tests (set/readback, clear, toggle, walk pattern)
+- [x] Add E2E NeoPixel write+trigger tests — 2 tests (single pixel, multi pixel)
+- [x] Add E2E BLHeli boot sequence tests — 2 tests (force low/release, ESC data after boot)
+- [x] Add E2E SPI TX egress tests — 2 tests (PING mirror, CS-high passthrough)
 
 ## 50 MHz control-path target checks
 
@@ -106,8 +111,16 @@ Goal: close all remaining SystemVerilog implementation gaps for a production-com
 - [ ] Add top-level debug/telemetry channel sources
 - [x] Tie board wrapper to production top signals
 - [ ] Close CDC/reset/timing hardening gaps
-- [x] Create cocotb for each new block — 86 cocotb tests across 17+ suites
-- [x] Run strict regression and timing gates — 119 tests, 0 failures
+- [x] Create cocotb for each new block — 103 cocotb tests across 22 suites
+- [x] Run strict regression and timing gates — 103 tests, 0 failures
+
+## RTL Bugs Fixed (Apr 2026)
+
+- [x] **CRC16 stale seed on back-to-back frames** — `fcsp_crc16.sv`: when `i_frame_start` and `i_data_valid` both assert on the same cycle, the CRC core was fed stale previous-frame CRC instead of 0. Fixed by muxing `crc_in = i_frame_start ? 0 : crc_reg` into the combinational core.
+- [x] **Parser pulse latching** — `fcsp_parser.sv`: pulse outputs (`o_frame_done`, etc.) were only cleared inside `if (in_valid && in_ready)`, staying latched when `in_valid` drops between frames. Fixed by clearing pulses unconditionally every clock cycle.
+- [x] **LED double-inversion** — `fcsp_tangnano9k_top.sv`: board wrapper applied `~led_reg_out` when `wb_led_controller` with `LED_POLARITY=0` already inverts internally. Removed redundant inversion.
+- [x] **Missing OP_PING handler** — `fcsp_wishbone_master.sv`: PING opcode (0x06) was not recognized as a single-byte command, returning `RES_NOT_SUPPORTED`. Added OP_PING case alongside GET_CAPS/HELLO.
+- [x] **SPI TX egress dual-egress** — `fcsp_offloader_top.sv`: implemented CS-gated SPI TX mirroring alongside USB TX.
 
 ---
 
@@ -185,13 +198,14 @@ and verified with a dedicated cocotb block-level testbench before integration.
 
 ### IP-6 — Wishbone IO Subsystem + fcsp_wishbone_master Integration — ✅ COMPLETE
 
-**Status**: `wb_io_bus.sv` created with 7-slave decode, `fcsp_wishbone_master` wired as active control plane, block-tested (`test_wb_io_bus_cocotb.py`, 7 tests; `test_fcsp_wishbone_master_cocotb.py`, 6 tests) + E2E tested (`test_e2e_fcsp_wb_io_cocotb.py`, 3 tests).
+**Status**: `wb_io_bus.sv` created with 7-slave decode, `fcsp_wishbone_master` wired as active control plane, block-tested (`test_wb_io_bus_cocotb.py`, 7 tests; `test_fcsp_wishbone_master_cocotb.py`, 8 tests) + E2E tested (`test_e2e_fcsp_wb_io_cocotb.py`, 4 tests).
 
 - [x] `rtl/io/wb_io_bus.sv` — decodes WHO_AM_I, PWM, DSHOT, MUX, NEO, ESC, LED
 - [x] `fcsp_wishbone_master` wired in `fcsp_offloader_top` (replaced `fcsp_serv_bridge`)
 - [x] `fcsp_io_engines.sv` instantiates all real IO slaves
-- [x] `HELLO`, `GET_CAPS`, `READ_BLOCK`, `WRITE_BLOCK` ops verified
+- [x] `HELLO`, `GET_CAPS`, `PING`, `READ_BLOCK`, `WRITE_BLOCK` ops verified
 - [x] E2E: WHO_AM_I read returns `0xFC500002`
+- [x] E2E: Two sequential READ_BLOCK commands both get responses (validates CRC16 fix)
 - [x] Block + E2E cocotb tests pass
 
 ---
@@ -204,7 +218,7 @@ and verified with a dedicated cocotb block-level testbench before integration.
 - [x] **M4**: IP-3 (PWM Decoder) ported and block-tested → RC input readable via Wishbone
 - [x] **M5**: IP-6 (WB bus + WB master integration) complete → `fcsp_wishbone_master` is active control path
 - [ ] **M6**: All blocks integrated in `fcsp_tangnano9k_top` → `tang9k-build` passes timing
-- [x] **M7**: `make test-all-strict` passes → 119 tests (33 Python + 86 cocotb), 0 failures
+- [x] **M7**: `make test-all-strict` passes → 103 cocotb tests across 22 suites, 0 failures
 - [ ] **M8**: All E2E Python hardware tests pass in simulation (`python/hw/test_hw_*.py --port sim`)
 
 ---

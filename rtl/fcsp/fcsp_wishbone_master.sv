@@ -153,6 +153,10 @@ module fcsp_wishbone_master (
                                 rsp_buf[0] <= RES_OK;
                                 rsp_len <= 16'd1;
                                 st <= ST_RSP_SEND;
+                            end else if (s_cmd_tdata == OP_PING) begin
+                                rsp_buf[0] <= RES_OK;
+                                rsp_len <= 16'd1;
+                                st <= ST_RSP_SEND;
                             end else begin
                                 rsp_buf[0] <= RES_NOT_SUPPORTED;
                                 rsp_len <= 16'd1;

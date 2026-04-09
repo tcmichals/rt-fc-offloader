@@ -82,13 +82,18 @@ module fcsp_parser #(
             m_frame_flags <= 8'd0;
             m_frame_seq <= 16'd0;
             m_frame_payload_len <= 16'd0;
-        end else if (in_valid && in_ready) begin
-            // default pulses low (set high only on event)
+        end else begin
+            // Always deassert single-cycle event pulses unconditionally so they
+            // don't stay latched when in_valid is low between frames.
             o_sync_seen    <= 1'b0;
             o_header_valid <= 1'b0;
             o_len_error    <= 1'b0;
             o_frame_done   <= 1'b0;
 
+            if (in_valid && in_ready) begin
+
+            // Clear pending frame output handshake before state machine
+            // logic may set it to 1 for a new byte.
             if (frame_out_valid && m_frame_tready) begin
                 frame_out_valid <= 1'b0;
                 frame_out_last <= 1'b0;
@@ -204,14 +209,11 @@ module fcsp_parser #(
                     state <= S_SEARCH_SYNC;
                 end
             endcase
-        end else begin
-            // no accepted byte this cycle: clear pulse outputs
-            o_sync_seen    <= 1'b0;
-            o_header_valid <= 1'b0;
-            o_len_error    <= 1'b0;
-            o_frame_done   <= 1'b0;
+            end  // if (in_valid && in_ready)
 
-            if (frame_out_valid && m_frame_tready) begin
+            // Allow frame_out handshake to complete even when no input byte
+            // is being accepted (idle cycles between frames).
+            if (!in_valid && frame_out_valid && m_frame_tready) begin
                 frame_out_valid <= 1'b0;
                 frame_out_last <= 1'b0;
             end

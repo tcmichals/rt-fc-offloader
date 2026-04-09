@@ -70,6 +70,7 @@ async def _collect_usb_tx_bytes(dut, max_bytes: int, max_cycles: int = 2000) -> 
         if bool(dut.o_usb_tx_valid.value):
             collected.append(int(dut.o_usb_tx_byte.value))
             if len(collected) >= max_bytes:
+                await NextTimeStep()
                 break
         await NextTimeStep()
     return bytes(collected)
@@ -143,6 +144,7 @@ async def test_ping_response(dut):
     rsp_frame = _try_decode_first_frame(raw_tx)
     assert rsp_frame is not None, f"Could not decode PING response from {raw_tx.hex()}"
     assert rsp_frame.channel == 0x01, f"Expected CONTROL channel (0x01), got 0x{rsp_frame.channel:02x}"
+    assert rsp_frame.payload[0] == 0x00, f"Expected RES_OK, got 0x{rsp_frame.payload[0]:02x}"
 
 
 @cocotb.test()
@@ -161,3 +163,28 @@ async def test_hello_response(dut):
     rsp_frame = _try_decode_first_frame(raw_tx)
     assert rsp_frame is not None, f"Could not decode HELLO response from {raw_tx.hex()}"
     assert rsp_frame.payload[0] == 0x00, f"Expected RES_OK, got 0x{rsp_frame.payload[0]:02x}"
+
+
+@cocotb.test()
+async def test_two_sequential_reads(dut):
+    """E2E: Two back-to-back READ_BLOCK commands should both get responses."""
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await _reset(dut)
+
+    RESP_LEN = 17
+
+    cmd1 = build_read_block_payload(space=0x01, address=0x4000_0000, length=4)
+    frame1 = encode_frame(flags=0, channel=0x01, seq=0x10, payload=cmd1)
+    collector1 = cocotb.start_soon(_collect_usb_tx_bytes(dut, max_bytes=RESP_LEN, max_cycles=3000))
+    await with_timeout(_drive_usb_bytes(dut, frame1), 100, "us")
+    raw1 = await with_timeout(collector1, 200, "us")
+    rsp1 = _try_decode_first_frame(raw1)
+    assert rsp1 is not None, f"First read: no response in {raw1.hex()}"
+
+    cmd2 = build_read_block_payload(space=0x01, address=0x4000_0000, length=4)
+    frame2 = encode_frame(flags=0, channel=0x01, seq=0x11, payload=cmd2)
+    collector2 = cocotb.start_soon(_collect_usb_tx_bytes(dut, max_bytes=RESP_LEN, max_cycles=3000))
+    await with_timeout(_drive_usb_bytes(dut, frame2), 100, "us")
+    raw2 = await with_timeout(collector2, 200, "us")
+    rsp2 = _try_decode_first_frame(raw2)
+    assert rsp2 is not None, f"Second read: no response in {raw2.hex()}"

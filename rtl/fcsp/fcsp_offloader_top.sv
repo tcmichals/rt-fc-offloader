@@ -573,16 +573,32 @@ module fcsp_offloader_top #(
     // TX transport seam (both ends)
     // -----------------------------
     // Transport routing policy:
-    // - CONTROL responses egress via async USB serial (host-side hardware scripts)
-    // - non-CONTROL channels egress via async USB serial
-    // NOTE: SPI egress stays available for future channel-aware routing policies.
-    assign tx_wire_tready = i_usb_tx_ready;
+    // - All TX responses egress via async USB serial.
+    // - Additionally mirrored to SPI TX when SPI CS is asserted (dual-egress).
+    //   The SPI master must clock SCLK to receive the bytes.
+
+    // SPI CS synchronizer for TX routing policy (independent of SPI frontend
+    // internal CDC — this is just for the mux/ready gating logic).
+    logic spi_cs_n_meta, spi_cs_n_sync;
+    always_ff @(posedge clk) begin
+        if (rst) begin
+            spi_cs_n_meta <= 1'b1;
+            spi_cs_n_sync <= 1'b1;
+        end else begin
+            spi_cs_n_meta <= i_spi_cs_n;
+            spi_cs_n_sync <= spi_cs_n_meta;
+        end
+    end
 
     assign o_usb_tx_valid = tx_wire_tvalid;
     assign o_usb_tx_byte  = tx_wire_tdata;
 
-    assign spi_tx_valid = 1'b0;
+    // SPI egress: valid only when SPI CS is active (asserted low).
+    assign spi_tx_valid = tx_wire_tvalid & ~spi_cs_n_sync;
     assign spi_tx_byte  = tx_wire_tdata;
+
+    // Back-pressure: USB must always be ready.  SPI only gates when CS active.
+    assign tx_wire_tready = i_usb_tx_ready & (spi_tx_ready | spi_cs_n_sync);
 
     // Prevent unused warnings for observability-only wires in scaffold phase.
     logic _unused_ok;

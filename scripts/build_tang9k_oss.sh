@@ -53,6 +53,8 @@ SOURCES=(
   "${ROOT_DIR}/rtl/fcsp/fcsp_tx_framer.sv"
   "${ROOT_DIR}/rtl/fcsp/fcsp_uart_byte_stream.sv"
   "${ROOT_DIR}/rtl/fcsp/fcsp_io_engines.sv"
+  "${ROOT_DIR}/rtl/fcsp/fcsp_stream_packetizer.sv"
+  "${ROOT_DIR}/rtl/fcsp/fcsp_debug_generator.sv"
   "${ROOT_DIR}/rtl/fcsp/drivers/wb_led_controller.sv"
   "${ROOT_DIR}/rtl/io/wb_io_bus.sv"
   "${ROOT_DIR}/rtl/io/wb_dshot_controller.sv"

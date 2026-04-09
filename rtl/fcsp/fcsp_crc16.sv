@@ -21,9 +21,14 @@ module fcsp_crc16 (
     logic [15:0] crc_reg;
     wire  [15:0] crc_next;
 
+    // When frame_start is asserted, feed the CRC core with initial value 0
+    // so the first byte is computed against a clean seed, even if crc_reg
+    // still holds the stale value from the previous frame.
+    wire [15:0] crc_in = i_frame_start ? 16'h0000 : crc_reg;
+
     fcsp_crc16_core_xmodem u_crc_core (
         .data_in(i_data_byte),
-        .crc_in(crc_reg),
+        .crc_in(crc_in),
         .crc_out(crc_next)
     );
 
