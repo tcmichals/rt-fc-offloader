@@ -98,7 +98,7 @@ endif
 PYTEST ?= $(if $(wildcard $(ROOT_DIR)/.venv/bin/pytest),$(ROOT_DIR)/.venv/bin/pytest,pytest)
 COCOTB_CONFIG ?= $(if $(wildcard $(ROOT_DIR)/.venv/bin/cocotb-config),$(ROOT_DIR)/.venv/bin/cocotb-config,cocotb-config)
 
-.PHONY: test-cocotb test-python test-hw-scripts-sim test-all test-all-strict test-top-cocotb test-top-cocotb-experimental test-fcsp-integration-cocotb test-wb-example-cocotb test-axis-example-cocotb test-tx-fifo-cocotb test-tx-arbiter-cocotb test-serial-mux-cocotb test-wb-led-cocotb test-fcsp-wb-master-cocotb test-e2e-all-cocotb test-fcsp-smoke-cocotb test-teaching-examples-cocotb test-stream-packetizer-cocotb test-e2e-esc-roundtrip-cocotb test-e2e-switching-cocotb test-e2e-led-cocotb test-e2e-neopixel-cocotb test-e2e-blheli-boot-cocotb test-e2e-spi-tx-cocotb test-esc-protocol-cocotb fit-evidence-snapshot fit-evidence-snapshot-live
+.PHONY: test-cocotb test-python test-hw-scripts-sim test-all test-all-strict test-top-cocotb test-top-cocotb-experimental test-fcsp-integration-cocotb test-wb-example-cocotb test-axis-example-cocotb test-tx-fifo-cocotb test-tx-arbiter-cocotb test-serial-mux-cocotb test-wb-led-cocotb test-fcsp-wb-master-cocotb test-e2e-all-cocotb test-fcsp-smoke-cocotb test-teaching-examples-cocotb test-stream-packetizer-cocotb test-e2e-esc-roundtrip-cocotb test-e2e-switching-cocotb test-e2e-led-cocotb test-e2e-neopixel-cocotb test-e2e-blheli-boot-cocotb test-e2e-spi-tx-cocotb test-esc-protocol-cocotb test-spi-routing-policy-cocotb fit-evidence-snapshot fit-evidence-snapshot-live
 
 check-cocotb:
 	@if [ -z "$(COCOTB_MAKEFILES)" ]; then \
@@ -205,7 +205,11 @@ test-esc-protocol-cocotb: check-cocotb
 	rm -rf sim_build results.xml
 	$(MAKE) -C . sim TOPLEVEL=fcsp_offloader_top COCOTB_TEST_MODULES=test_esc_protocol_cocotb VERILOG_SOURCES="$(FCSP_TOP_SOURCES)"
 
-test-e2e-all-cocotb: test-top-cocotb test-top-cocotb-experimental test-serial-mux-cocotb test-wb-led-cocotb test-fcsp-wb-master-cocotb test-wb-io-bus-cocotb test-dshot-out-cocotb test-wb-neopx-cocotb test-pwmdecoder-cocotb test-wb-esc-uart-cocotb test-e2e-fcsp-wb-io-cocotb test-e2e-switching-cocotb test-e2e-led-cocotb test-e2e-neopixel-cocotb test-e2e-blheli-boot-cocotb test-e2e-spi-tx-cocotb test-esc-protocol-cocotb
+test-spi-routing-policy-cocotb: check-cocotb
+	rm -rf sim_build results.xml
+	$(MAKE) -C . sim TOPLEVEL=fcsp_offloader_top COCOTB_TEST_MODULES=test_spi_routing_policy_cocotb VERILOG_SOURCES="$(FCSP_TOP_SOURCES)"
+
+test-e2e-all-cocotb: test-top-cocotb test-top-cocotb-experimental test-serial-mux-cocotb test-wb-led-cocotb test-fcsp-wb-master-cocotb test-wb-io-bus-cocotb test-dshot-out-cocotb test-wb-neopx-cocotb test-pwmdecoder-cocotb test-wb-esc-uart-cocotb test-e2e-fcsp-wb-io-cocotb test-e2e-switching-cocotb test-e2e-led-cocotb test-e2e-neopixel-cocotb test-e2e-blheli-boot-cocotb test-e2e-spi-tx-cocotb test-esc-protocol-cocotb test-spi-routing-policy-cocotb
 
 # Default smoke gate stays deterministic and fast.
 test-fcsp-smoke-cocotb: test-cocotb test-tx-arbiter-cocotb
@@ -221,7 +225,7 @@ test-hw-scripts-sim:
 test-all: test-python test-hw-scripts-sim test-fcsp-smoke-cocotb test-teaching-examples-cocotb
 
 # Strict gate includes top-level and integration-oriented suites.
-test-all-strict: test-all test-top-cocotb test-top-cocotb-experimental test-serial-mux-cocotb test-wb-led-cocotb test-fcsp-wb-master-cocotb test-wb-io-bus-cocotb test-dshot-out-cocotb test-wb-neopx-cocotb test-pwmdecoder-cocotb test-wb-esc-uart-cocotb test-e2e-fcsp-wb-io-cocotb test-stream-packetizer-cocotb test-e2e-esc-roundtrip-cocotb test-e2e-switching-cocotb test-e2e-led-cocotb test-e2e-neopixel-cocotb test-e2e-blheli-boot-cocotb test-e2e-spi-tx-cocotb test-esc-protocol-cocotb
+test-all-strict: test-all test-top-cocotb test-top-cocotb-experimental test-serial-mux-cocotb test-wb-led-cocotb test-fcsp-wb-master-cocotb test-wb-io-bus-cocotb test-dshot-out-cocotb test-wb-neopx-cocotb test-pwmdecoder-cocotb test-wb-esc-uart-cocotb test-e2e-fcsp-wb-io-cocotb test-stream-packetizer-cocotb test-e2e-esc-roundtrip-cocotb test-e2e-switching-cocotb test-e2e-led-cocotb test-e2e-neopixel-cocotb test-e2e-blheli-boot-cocotb test-e2e-spi-tx-cocotb test-esc-protocol-cocotb test-spi-routing-policy-cocotb
 
 fit-evidence-snapshot:
 	bash ../scripts/generate_fit_evidence_snapshot.sh

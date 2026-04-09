@@ -79,6 +79,7 @@ module fcsp_offloader_top #(
     output logic                    o_dbg_tx_frame_seen
 );
     localparam int STREAM_FIFO_DEPTH = MAX_PAYLOAD_LEN;
+    localparam logic [7:0] CH_CONTROL = 8'h01;
 
     // -----------------------------
     // SPI frontend -> selected RX
@@ -160,6 +161,23 @@ module fcsp_offloader_top #(
     logic        router_route_valid, router_route_drop;
     logic [7:0]  router_route_channel;
 
+    // ── SPI ingress channel filter ─────────────────────────────────
+    // SPI frames are restricted to CONTROL channel only.  Any non-CONTROL
+    // frame arriving via SPI is consumed (dropped) before the router.
+    logic        frame_from_spi;
+    logic        spi_ingress_drop;
+    logic        router_s_tready;
+
+    always_ff @(posedge clk) begin
+        if (rst)
+            frame_from_spi <= 1'b0;
+        else if (o_parser_sync_seen)
+            frame_from_spi <= ~sel_usb_rx;
+    end
+
+    assign spi_ingress_drop = frame_from_spi & (crc_frame_channel != CH_CONTROL);
+    assign crc_frame_tready = spi_ingress_drop ? 1'b1 : router_s_tready;
+
     fcsp_parser #(
         .MAX_PAYLOAD_LEN(MAX_PAYLOAD_LEN)
     ) u_parser (
@@ -220,10 +238,10 @@ module fcsp_offloader_top #(
     fcsp_router u_router (
         .clk            (clk),
         .rst            (rst),
-        .s_frame_tvalid (crc_frame_tvalid),
+        .s_frame_tvalid (crc_frame_tvalid & ~spi_ingress_drop),
         .s_frame_tdata  (crc_frame_tdata),
         .s_frame_tlast  (crc_frame_tlast),
-        .s_frame_tready (crc_frame_tready),
+        .s_frame_tready (router_s_tready),
         .s_frame_channel(crc_frame_channel),
         .s_frame_flags  (crc_frame_flags),
         .s_frame_seq    (crc_frame_seq),
@@ -488,8 +506,6 @@ module fcsp_offloader_top #(
         .o_frame_done(tx_framer_frame_done)
     );
 
-    localparam logic [7:0] CH_CONTROL     = 8'h01;
-
     // Latch the channel of each frame at framer entry so physical egress
     // routing can be channel-aware for the entire serialized frame.
     always_ff @(posedge clk) begin
@@ -574,8 +590,9 @@ module fcsp_offloader_top #(
     // -----------------------------
     // Transport routing policy:
     // - All TX responses egress via async USB serial.
-    // - Additionally mirrored to SPI TX when SPI CS is asserted (dual-egress).
-    //   The SPI master must clock SCLK to receive the bytes.
+    // - CONTROL-channel responses are additionally mirrored to SPI TX when
+    //   SPI CS is asserted (dual-egress).  Non-CONTROL responses (e.g. ESC
+    //   UART) are suppressed on SPI so only USB sees them.
 
     // SPI CS synchronizer for TX routing policy (independent of SPI frontend
     // internal CDC — this is just for the mux/ready gating logic).
@@ -593,12 +610,12 @@ module fcsp_offloader_top #(
     assign o_usb_tx_valid = tx_wire_tvalid;
     assign o_usb_tx_byte  = tx_wire_tdata;
 
-    // SPI egress: valid only when SPI CS is active (asserted low).
-    assign spi_tx_valid = tx_wire_tvalid & ~spi_cs_n_sync;
+    // SPI egress: valid only when SPI CS is active AND frame is CONTROL.
+    assign spi_tx_valid = tx_wire_tvalid & ~spi_cs_n_sync & tx_route_spi_control;
     assign spi_tx_byte  = tx_wire_tdata;
 
-    // Back-pressure: USB must always be ready.  SPI only gates when CS active.
-    assign tx_wire_tready = i_usb_tx_ready & (spi_tx_ready | spi_cs_n_sync);
+    // Back-pressure: USB must always be ready.  SPI gates on CS + CONTROL.
+    assign tx_wire_tready = i_usb_tx_ready & (spi_tx_ready | spi_cs_n_sync | ~tx_route_spi_control);
 
     // Prevent unused warnings for observability-only wires in scaffold phase.
     logic _unused_ok;
@@ -637,6 +654,7 @@ module fcsp_offloader_top #(
                    ^ tx_arb_tready ^ tx_arb_tdata[0] ^ tx_arb_channel[0]
                    ^ tx_arb_flags[0] ^ tx_arb_seq[0]
                    ^ tx_frame_channel_latched[0] ^ tx_route_spi_control
+                   ^ frame_from_spi ^ spi_ingress_drop
                    ^ wb_dbg_tvalid_unused ^ wb_dbg_tdata_unused[0]
                    ^ wb_dbg_tlast_unused;
     end
