@@ -362,7 +362,7 @@ Goal: every feature that ships in the FPGA bitstream is verified in simulation (
 - [x] **Wire CH 0x05 ESC stream path in `fcsp_offloader_top`**: router_esc → ESC UART stream TX, ESC UART RX → `fcsp_stream_packetizer` → `fcsp_tx_arbiter` ESC input
 - [x] **Add AXIS stream ports to `rtl/io/wb_esc_uart.sv`**: `s_esc_tdata/tvalid/tready` (TX) + `m_esc_tdata/tvalid/tready` (RX)
 - [x] **Instantiate `fcsp_stream_packetizer`** in `fcsp_offloader_top` — MAX_LEN=16, TIMEOUT=1000
-- [ ] **Enable SPI TX egress**: route `tx_wire_*` to `fcsp_spi_frontend` TX side (channel-aware policy) — still `spi_tx_valid = 1'b0`
+- [x] **Enable SPI TX egress**: dual-egress policy implemented — USB always, SPI mirrored when CS active
 
 ### Cocotb tests needed (block-level)
 
@@ -426,7 +426,7 @@ New scripts needed:
 
 ### Remaining open items summary (Apr 8, 2026)
 
-- [ ] Enable SPI TX egress (`spi_tx_valid` still tied off)
+- ~~Enable SPI TX egress~~ ✅ Done — dual-egress implemented + 2 E2E tests passing
 - [ ] 4 new Python HW scripts: `test_hw_dshot_status.py`, `test_hw_pwm_readback.py`, `test_hw_esc_uart_loopback.py`, `test_hw_register_sweep.py`
 - ~~Repository cleanup: `firmware/serv8/`, 13 legacy RTL duplicates, 2 dead modules~~ ✅ Done
 - [ ] CDC/reset/timing hardening
