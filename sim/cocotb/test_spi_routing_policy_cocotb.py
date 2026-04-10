@@ -18,6 +18,7 @@ from python_fcsp.fcsp_codec import (
     encode_frame,
     decode_frame,
 )
+from hwlib.registers import MUX_CTRL
 
 SIM_CLK_NS = 18.5  # ~54 MHz
 SPI_HALF_PERIOD = 12
@@ -110,7 +111,7 @@ async def _collect_usb_tx_bytes(dut, cycles=3000):
     return collected
 
 
-MUX_REG = 0x40000400
+MUX_REG = MUX_CTRL
 
 
 async def _setup_serial_mode_usb(dut, channel: int = 0, seq: int = 1):

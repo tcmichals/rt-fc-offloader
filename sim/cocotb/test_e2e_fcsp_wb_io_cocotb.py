@@ -14,6 +14,7 @@ from python_fcsp.fcsp_codec import (
     decode_frame,
     encode_frame,
 )
+from hwlib.registers import EXPECTED_WHO_AM_I, WHO_AM_I
 
 
 async def _reset(dut):
@@ -98,12 +99,12 @@ def _try_decode_first_frame(raw: bytes):
 
 @cocotb.test()
 async def test_read_block_who_am_i(dut):
-    """E2E: READ_BLOCK of WHO_AM_I register (0x40000000) returns 0xFC500002."""
+    """E2E: READ_BLOCK of WHO_AM_I register returns 0xFC500002."""
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await _reset(dut)
 
-    # Build READ_BLOCK command: space=0x01, address=0x40000000, length=4
-    cmd_payload = build_read_block_payload(space=0x01, address=0x4000_0000, length=4)
+    # Build READ_BLOCK command: space=0x01, address=WHO_AM_I, length=4
+    cmd_payload = build_read_block_payload(space=0x01, address=WHO_AM_I, length=4)
     frame = encode_frame(flags=0, channel=0x01, seq=0x42, payload=cmd_payload)
 
     # Start collecting response before sending (response comes after processing)
@@ -125,7 +126,7 @@ async def test_read_block_who_am_i(dut):
     assert data_len == 4, f"Expected read length 4, got {data_len}"
 
     who_am_i = (rsp[3] << 24) | (rsp[4] << 16) | (rsp[5] << 8) | rsp[6]
-    assert who_am_i == 0xFC50_0002, f"WHO_AM_I expected 0xFC500002, got 0x{who_am_i:08x}"
+    assert who_am_i == EXPECTED_WHO_AM_I, f"WHO_AM_I expected 0x{EXPECTED_WHO_AM_I:08x}, got 0x{who_am_i:08x}"
 
 
 @cocotb.test()
@@ -173,7 +174,7 @@ async def test_two_sequential_reads(dut):
 
     RESP_LEN = 17
 
-    cmd1 = build_read_block_payload(space=0x01, address=0x4000_0000, length=4)
+    cmd1 = build_read_block_payload(space=0x01, address=WHO_AM_I, length=4)
     frame1 = encode_frame(flags=0, channel=0x01, seq=0x10, payload=cmd1)
     collector1 = cocotb.start_soon(_collect_usb_tx_bytes(dut, max_bytes=RESP_LEN, max_cycles=3000))
     await with_timeout(_drive_usb_bytes(dut, frame1), 100, "us")
@@ -181,7 +182,7 @@ async def test_two_sequential_reads(dut):
     rsp1 = _try_decode_first_frame(raw1)
     assert rsp1 is not None, f"First read: no response in {raw1.hex()}"
 
-    cmd2 = build_read_block_payload(space=0x01, address=0x4000_0000, length=4)
+    cmd2 = build_read_block_payload(space=0x01, address=WHO_AM_I, length=4)
     frame2 = encode_frame(flags=0, channel=0x01, seq=0x11, payload=cmd2)
     collector2 = cocotb.start_soon(_collect_usb_tx_bytes(dut, max_bytes=RESP_LEN, max_cycles=3000))
     await with_timeout(_drive_usb_bytes(dut, frame2), 100, "us")

@@ -15,14 +15,9 @@ from python_fcsp.fcsp_codec import (
     decode_frame,
     encode_frame,
 )
+from hwlib.registers import LED_OUT, LED_TOGGLE, LED_CLEAR, LED_SET
 
 SIM_CLK_NS = 18.5  # ~54 MHz
-
-LED_BASE   = 0x4000_0C00
-LED_OUT    = LED_BASE + 0x00
-LED_TOGGLE = LED_BASE + 0x04
-LED_CLEAR  = LED_BASE + 0x08
-LED_SET    = LED_BASE + 0x0C
 
 
 # ---------------------------------------------------------------------------

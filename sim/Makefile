@@ -82,7 +82,7 @@ WB_ESC_UART_SOURCES := \
 STREAM_PACKETIZER_SOURCES := \
 	$(ROOT_DIR)/rtl/fcsp/fcsp_stream_packetizer.sv
 
-export PYTHONPATH := $(SIM_DIR):$(SIM_DIR)/cocotb:$(PYTHONPATH)
+export PYTHONPATH := $(SIM_DIR):$(SIM_DIR)/cocotb:$(ROOT_DIR)/python/hw:$(PYTHONPATH)
 
 SIM ?= verilator
 EXTRA_ARGS += --Wno-WIDTH --Wno-CASEINCOMPLETE --Wno-PINMISSING

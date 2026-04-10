@@ -18,10 +18,11 @@ from python_fcsp.fcsp_codec import (
     encode_frame,
     Channel,
 )
+from hwlib.registers import MUX_CTRL
 
 SIM_CLK_NS = 18.5  # ~54 MHz
 
-MUX_REG = 0x4000_0400
+MUX_REG = MUX_CTRL
 
 
 async def _reset(dut):

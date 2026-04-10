@@ -14,13 +14,13 @@ from python_fcsp.fcsp_codec import (
     decode_frame,
     encode_frame,
 )
+from hwlib.registers import NEO_PIXEL_0, NEO_PIXEL_1, NEO_UPDATE
 
 SIM_CLK_NS = 18.5  # ~54 MHz
 
-NEO_BASE    = 0x4000_0600
-NEO_PIXEL0  = NEO_BASE + 0x00
-NEO_PIXEL1  = NEO_BASE + 0x04
-NEO_TRIGGER = NEO_BASE + 0x20
+NEO_PIXEL0  = NEO_PIXEL_0
+NEO_PIXEL1  = NEO_PIXEL_1
+NEO_TRIGGER = NEO_UPDATE
 
 
 async def _reset(dut):

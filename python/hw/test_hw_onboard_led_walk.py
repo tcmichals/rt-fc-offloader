@@ -20,7 +20,7 @@ from __future__ import annotations
 import argparse
 import time
 
-from hwlib import EXPECTED_WHO_AM_I, FcspControlClient, WHO_AM_I
+from hwlib import EXPECTED_WHO_AM_I, FcspControlClient, WHO_AM_I, LED_BASE
 
 LED_OUT_OFF = 0x00
 LED_TOGGLE_OFF = 0x04
@@ -95,9 +95,9 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--baud", type=int, default=1_000_000, help="Baud rate (default: 1000000)")
     ap.add_argument(
         "--led-base",
-        required=True,
+        default=LED_BASE,
         type=lambda x: int(x, 0),
-        help="Base address of wb_led_controller (e.g. 0x40000C00)",
+        help=f"Base address of wb_led_controller (default: 0x{LED_BASE:08X})",
     )
     ap.add_argument("--width", type=int, default=4, help="Number of LED bits to walk (default: 4)")
     ap.add_argument("--step-ms", type=int, default=120, help="Step delay in ms (default: 120)")

@@ -30,11 +30,12 @@ from esc_traffic_gen import (
     CMD_DEVICE_RESET,
     CMD_INTERFACE_EXIT,
 )
+from hwlib.registers import MUX_CTRL, ESC_BAUD_DIV, ESC_STATUS
 
 SIM_CLK_NS = 18.5  # ~54 MHz
-MUX_REG = 0x4000_0400
-ESC_BAUD_REG = 0x4000_090C
-ESC_STATUS_REG = 0x4000_0904
+MUX_REG = MUX_CTRL
+ESC_BAUD_REG = ESC_BAUD_DIV
+ESC_STATUS_REG = ESC_STATUS
 
 
 async def _reset(dut):

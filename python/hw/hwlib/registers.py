@@ -40,10 +40,50 @@ MODE_SERIAL = 0  # bit[0]=0 => serial/passthrough
 MODE_DSHOT  = 1  # bit[0]=1 => dshot
 
 # ---------------------------------------------------------------------------
-# NeoPixel  (base 0x40000600)
+# PWM decoder  (base 0x40000100)
+# Read-only channel values [15:0] and status [5:0] ready bits
 # ---------------------------------------------------------------------------
-NEO_PIXEL_0 = 0x40000600
-NEO_UPDATE  = 0x40000620
+PWM_BASE      = 0x40000100
+
+PWM_CH0       = PWM_BASE + 0x00   # [15:0] channel 0 pulse width
+PWM_CH1       = PWM_BASE + 0x04
+PWM_CH2       = PWM_BASE + 0x08
+PWM_CH3       = PWM_BASE + 0x0C
+PWM_CH4       = PWM_BASE + 0x10
+PWM_CH5       = PWM_BASE + 0x14
+PWM_STATUS    = PWM_BASE + 0x18   # [5:0] ready bits
+
+PWM_CHANNELS  = (PWM_CH0, PWM_CH1, PWM_CH2, PWM_CH3, PWM_CH4, PWM_CH5)
+
+# ---------------------------------------------------------------------------
+# NeoPixel  (base 0x40000600)
+# Pixel slots 0..7 (32-bit each), trigger at +0x20
+# ---------------------------------------------------------------------------
+NEO_BASE      = 0x40000600
+
+NEO_PIXEL_0   = NEO_BASE + 0x00
+NEO_PIXEL_1   = NEO_BASE + 0x04
+NEO_PIXEL_2   = NEO_BASE + 0x08
+NEO_PIXEL_3   = NEO_BASE + 0x0C
+NEO_PIXEL_4   = NEO_BASE + 0x10
+NEO_PIXEL_5   = NEO_BASE + 0x14
+NEO_PIXEL_6   = NEO_BASE + 0x18
+NEO_PIXEL_7   = NEO_BASE + 0x1C
+NEO_UPDATE    = NEO_BASE + 0x20
+
+NEO_PIXELS    = (NEO_PIXEL_0, NEO_PIXEL_1, NEO_PIXEL_2, NEO_PIXEL_3,
+                 NEO_PIXEL_4, NEO_PIXEL_5, NEO_PIXEL_6, NEO_PIXEL_7)
+
+# ---------------------------------------------------------------------------
+# ESC UART  (base 0x40000900)
+# Half-duplex ESC UART controller
+# ---------------------------------------------------------------------------
+ESC_BASE      = 0x40000900
+
+ESC_TX_DATA   = ESC_BASE + 0x00   # W:  TX byte (low 8 bits)
+ESC_STATUS    = ESC_BASE + 0x04   # R:  bit0=tx_ready, bit1=rx_valid, bit2=tx_active
+ESC_RX_DATA   = ESC_BASE + 0x08   # R:  RX byte (reading clears rx_valid)
+ESC_BAUD_DIV  = ESC_BASE + 0x0C   # RW: [15:0] baud divisor
 
 # ---------------------------------------------------------------------------
 # On-board LED controller  (base 0x40000C00)

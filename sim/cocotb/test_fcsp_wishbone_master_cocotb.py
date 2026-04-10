@@ -28,6 +28,8 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, ReadOnly, NextTimeStep, with_timeout
 
+from hwlib.registers import EXPECTED_WHO_AM_I, WHO_AM_I, LED_OUT, LED_SET
+
 _OP_READ_BLOCK  = 0x10
 _OP_WRITE_BLOCK = 0x11
 _OP_GET_CAPS    = 0x12
@@ -149,7 +151,7 @@ async def read_block_issues_wb_read_cycle(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await _reset(dut)
 
-    target_addr = 0x40000000
+    target_addr = WHO_AM_I
 
     cocotb.start_soon(_drive_cmd_payload(dut, _read_block_payload(target_addr, 4)))
 
@@ -172,8 +174,8 @@ async def read_block_returns_wb_data(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await _reset(dut)
 
-    target_addr    = 0x40000000
-    expected_value = 0xFC500002
+    target_addr    = WHO_AM_I
+    expected_value = EXPECTED_WHO_AM_I
 
     async def _wb_responder():
         for _ in range(400):
@@ -205,12 +207,12 @@ async def read_block_returns_wb_data(dut):
 
 @cocotb.test()
 async def read_block_who_am_i_full_roundtrip(dut):
-    """Full roundtrip: READ_BLOCK @ 0x40000000, WB returns 0xFC500002."""
+    """Full roundtrip: READ_BLOCK @ WHO_AM_I, WB returns 0xFC500002."""
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await _reset(dut)
 
-    target_addr = 0x40000000
-    expected_id = 0xFC500002
+    target_addr = WHO_AM_I
+    expected_id = EXPECTED_WHO_AM_I
 
     async def _wb_responder():
         for _ in range(400):
@@ -250,7 +252,7 @@ async def write_block_issues_wb_write_cycle(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await _reset(dut)
 
-    target_addr = 0x40000C0C        # LED_SET
+    target_addr = LED_SET
     write_val   = 0x00000005
     payload = _write_block_payload(target_addr, struct.pack(">I", write_val))
 
@@ -286,7 +288,7 @@ async def sequential_read_write_read(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await _reset(dut)
 
-    addr   = 0x40000C00
+    addr   = LED_OUT
     stored = [0x00000000]
 
     async def _wb_slave():

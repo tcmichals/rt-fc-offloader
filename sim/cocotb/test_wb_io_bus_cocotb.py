@@ -4,6 +4,12 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, ReadOnly, NextTimeStep
 
+from hwlib.registers import (
+    EXPECTED_WHO_AM_I, WHO_AM_I,
+    DSHOT_BASE, NEO_BASE, ESC_BASE, PWM_BASE, LED_BASE,
+    MUX_CTRL,
+)
+
 
 async def _reset(dut):
     dut.rst.value = 1
@@ -84,45 +90,45 @@ async def _stub_slave_ack(dut, prefix, read_data=0xDEAD_BEEF):
 
 @cocotb.test()
 async def test_who_am_i_returns_identity(dut):
-    """WHO_AM_I read at 0x40000000 returns 0xFC500002."""
+    """WHO_AM_I read returns identity value."""
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await _reset(dut)
-    val = await _wb_read(dut, 0x4000_0000)
-    assert val == 0xFC50_0002, f"WHO_AM_I expected 0xFC500002, got 0x{val:08x}"
+    val = await _wb_read(dut, WHO_AM_I)
+    assert val == EXPECTED_WHO_AM_I, f"WHO_AM_I expected 0x{EXPECTED_WHO_AM_I:08x}, got 0x{val:08x}"
 
 
 @cocotb.test()
 async def test_dshot_page_routes_to_dshot_slave(dut):
-    """Write to DShot page (0x40000300) routes to dshot slave port."""
+    """Write to DShot page routes to dshot slave port."""
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await _reset(dut)
 
     stub = cocotb.start_soon(_stub_slave_ack(dut, "dshot", 0x1234_5678))
-    val = await _wb_read(dut, 0x4000_0300)
+    val = await _wb_read(dut, DSHOT_BASE)
     await stub
     assert val == 0x1234_5678, f"DShot read expected 0x12345678, got 0x{val:08x}"
 
 
 @cocotb.test()
 async def test_neo_page_routes_to_neo_slave(dut):
-    """Read from NeoPixel page (0x40000600) routes to neo slave port."""
+    """Read from NeoPixel page routes to neo slave port."""
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await _reset(dut)
 
     stub = cocotb.start_soon(_stub_slave_ack(dut, "neo", 0xAABB_CCDD))
-    val = await _wb_read(dut, 0x4000_0600)
+    val = await _wb_read(dut, NEO_BASE)
     await stub
     assert val == 0xAABB_CCDD, f"Neo read expected 0xAABBCCDD, got 0x{val:08x}"
 
 
 @cocotb.test()
 async def test_esc_page_routes_to_esc_slave(dut):
-    """Read from ESC page (0x40000900) routes to esc slave port."""
+    """Read from ESC page routes to esc slave port."""
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await _reset(dut)
 
     stub = cocotb.start_soon(_stub_slave_ack(dut, "esc", 0x0000_0007))
-    val = await _wb_read(dut, 0x4000_0900)
+    val = await _wb_read(dut, ESC_BASE)
     await stub
     assert val == 0x0000_0007, f"ESC read expected 0x00000007, got 0x{val:08x}"
 
@@ -138,23 +144,23 @@ async def test_unmatched_address_returns_zero(dut):
 
 @cocotb.test()
 async def test_pwm_page_routes_to_pwm_slave(dut):
-    """Read from PWM page (0x40000100) routes to pwm slave port."""
+    """Read from PWM page routes to pwm slave port."""
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await _reset(dut)
 
     stub = cocotb.start_soon(_stub_slave_ack(dut, "pwm", 0x0000_03E8))
-    val = await _wb_read(dut, 0x4000_0100)
+    val = await _wb_read(dut, PWM_BASE)
     await stub
     assert val == 0x0000_03E8, f"PWM read expected 0x000003E8, got 0x{val:08x}"
 
 
 @cocotb.test()
 async def test_led_page_routes_to_led_slave(dut):
-    """Read from LED page (0x40000C00) routes to led slave port."""
+    """Read from LED page routes to led slave port."""
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await _reset(dut)
 
     stub = cocotb.start_soon(_stub_slave_ack(dut, "led", 0x0000_000F))
-    val = await _wb_read(dut, 0x4000_0C00)
+    val = await _wb_read(dut, LED_BASE)
     await stub
     assert val == 0x0000_000F, f"LED read expected 0x0000000F, got 0x{val:08x}"
