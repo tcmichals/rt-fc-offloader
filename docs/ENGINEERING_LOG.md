@@ -20,6 +20,61 @@ Newest entries should be added near the top.
 
 ---
 
+## 2026-04-12 — Tang Nano 20K serial poll verified stable on hardware
+
+- Ran hardware poll:
+  - `python3 ./test_hw_version_poll.py --port /dev/ttyUSB1`
+- Observed stable FCSP CONTROL response behavior at `1_000_000` baud:
+  - `WHO_AM_I 0xFC500002 (OK)`
+  - `ok=16 bad=0 err=0 total=16` during run
+  - final stop summary: `ok=16, bad=0, err=0, total=17, expected=0xFC500002`
+- Validation outcome:
+  - end-to-end UART + FCSP request/response path is confirmed functional on Tang Nano 20K for the WHO_AM_I poll loop.
+
+Follow-up note:
+
+- Keep this result as bring-up evidence for current RTL/debug configuration.
+- If cleanup is desired next, remove or gate temporary host-side compatibility allowances once metadata behavior is fully confirmed across additional commands.
+
+---
+
+## 2026-04-12 — Tang Nano 20K FCSP serial bring-up: parser/TX visibility debug pass
+
+- Debugged hardware symptom: `test_hw_version_poll.py` sees no reliable response on first attempts.
+- Confirmed UART baud alignment target for this pass is **1_000_000** (`fcsp_uart_byte_stream` on board wrapper).
+- During debug, user capture showed:
+  - raw UART RX frame traffic is present and decodable on analyzer
+  - `usb_rx_valid`/`usb_rx_ready` behavior appears delayed until later packet attempts
+  - limited visibility on downstream parser/TX events at analyzer sample rates
+
+Code updates made:
+
+- `rtl/fcsp/boards/tangnano20k/fcsp_tangnano20k_top.sv`
+  - expanded debug outputs to `o_debug_0..o_debug_6`
+  - set `SYS_CLK_HZ = 54_000_000`
+  - set UART `.BAUD(1_000_000)`
+  - fixed PLL config to satisfy apycula VCO limits while keeping 54 MHz output:
+    - `IDIV_SEL=0`, `FBDIV_SEL=1`, `ODIV_SEL=16` (`VCO=864 MHz`, `CLKOUT=54 MHz`)
+  - added analyzer-friendly debug visibility wiring and hold/stretch counters for key short events
+  - current debug focus mapping includes raw RX/TX lines plus internal RX/parse/TX handshake visibility
+
+- `rtl/fcsp/fcsp_offloader_top.sv`
+  - fixed missing Wishbone response transport-id connection:
+    - added `.s_tid(ctrl_rx_tid)` on `fcsp_wishbone_master` instantiation
+
+Toolchain/build finding captured:
+
+- `gowin_pack` rejects PLL settings when VCO is out of range for `GW2AR-18`.
+  - observed failure with `ODIV_SEL=8` (`VCO=432 MHz`, below allowed range)
+  - resolved by restoring `ODIV_SEL=16` (`VCO=864 MHz`, valid)
+
+Current status:
+
+- Instrumentation for serial/parser/TX flow is in place for hardware captures.
+- Remaining task is iterative hardware verification against logic-analyzer traces and confirming stable first-packet behavior.
+
+---
+
 ## 2026-04-05 — Teaching focus: pure register writes for control; timing stays in RTL
 
 - Captured and reinforced a core teaching rule for this repo:

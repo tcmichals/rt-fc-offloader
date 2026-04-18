@@ -12,46 +12,46 @@
 //
 // Source: /media/tcmichals/projects/Tang9K/HacksterIO/SPIQuadCopter/src/wb_serial_dshot_mux.sv
 
-`default_nettype none
+`default_nettype wire
 
 module wb_serial_dshot_mux #(
     parameter int CLK_FREQ_HZ = 54_000_000
 ) (
-    input  logic        clk,
-    input  logic        rst,
+    input  wire        clk,
+    input  wire        rst,
 
     // Wishbone slave
-    input  logic [31:0] wb_dat_i,
-    input  logic [31:0] wb_adr_i,
-    input  logic        wb_we_i,
-    input  logic [3:0]  wb_sel_i,
-    input  logic        wb_stb_i,
-    input  logic        wb_cyc_i,
+    input  wire [31:0] wb_dat_i,
+    input  wire [31:0] wb_adr_i,
+    input  wire        wb_we_i,
+    input  wire [3:0]  wb_sel_i,
+    input  wire        wb_stb_i,
+    input  wire        wb_cyc_i,
     output logic [31:0] wb_dat_o,
     output logic        wb_ack_o,
 
     // Status outputs
-    output logic        mux_sel,        // 0=serial, 1=DShot (effective)
+    output wire        mux_sel,        // 0=serial, 1=DShot (effective)
     output logic [1:0]  mux_ch,         // selected motor channel
     output logic        msp_mode,       // 0=passthrough, 1=MSP
 
     // PC sniffer interface
-    input  logic [7:0]  pc_rx_data,
-    input  logic        pc_rx_valid,
+    input  wire [7:0]  pc_rx_data,
+    input  wire        pc_rx_valid,
 
     // Motor pad bidirectional
     inout  wire  [3:0]  pad_motor,
 
     // Internal inputs
-    input  logic [3:0]  dshot_in,       // from DSHOT controller
-    input  logic        serial_tx_i,    // from serial bridge
-    input  logic        serial_oe_i,    // from serial bridge (active high)
-    output logic        serial_rx_o     // to serial bridge
+    input  wire [3:0]  dshot_in,       // from DSHOT controller
+    input  wire        serial_tx_i,    // from serial bridge
+    input  wire        serial_oe_i,    // from serial bridge (active high)
+    output wire        serial_rx_o     // to serial bridge
 
 `ifdef SIM_CONTROL
-    , input  logic        tb_mux_force_en
-    , input  logic        tb_mux_force_sel
-    , input  logic [1:0]  tb_mux_force_ch
+    , input  wire        tb_mux_force_en
+    , input  wire        tb_mux_force_sel
+    , input  wire [1:0]  tb_mux_force_ch
 `endif
 );
 

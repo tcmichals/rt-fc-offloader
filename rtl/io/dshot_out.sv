@@ -15,18 +15,18 @@
 //
 // Source: /media/tcmichals/projects/Tang9K/HacksterIO/SPIQuadCopter/dshot/dshot_out.v
 
-`default_nettype none
+`default_nettype wire
 
 module dshot_out #(
     parameter int CLK_FREQ_HZ = 54_000_000
 ) (
-    input  logic        clk,
-    input  logic        rst,
-    input  logic [15:0] i_dshot_value,
-    input  logic [15:0] i_dshot_mode,   // 150, 300, or 600
-    input  logic        i_write,
-    output logic        o_pwm,
-    output logic        o_ready
+    input  wire        clk,
+    input  wire        rst,
+    input  wire [15:0] i_dshot_value,
+    input  wire [15:0] i_dshot_mode,   // 150, 300, or 600
+    input  wire        i_write,
+    output wire        o_pwm,
+    output wire        o_ready
 );
 
     // Frequency validation

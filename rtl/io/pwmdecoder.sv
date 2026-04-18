@@ -5,15 +5,15 @@
 //
 // Source: /media/tcmichals/projects/Tang9K/HacksterIO/SPIQuadCopter/pwmDecoder/pwmdecoder.v
 
-`default_nettype none
+`default_nettype wire
 
 module pwmdecoder #(
     parameter int CLK_FREQ_HZ = 54_000_000
 ) (
-    input  logic        clk,
-    input  logic        rst,
-    input  logic        i_pwm,
-    output logic        o_pwm_ready,
+    input  wire        clk,
+    input  wire        rst,
+    input  wire        i_pwm,
+    output wire        o_pwm_ready,
     output logic [15:0] o_pwm_value
 );
 

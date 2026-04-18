@@ -1,4 +1,4 @@
-`default_nettype none
+`default_nettype wire
 
 // FCSP TX FIFO wrapper (skeleton)
 //
@@ -7,28 +7,30 @@
 module fcsp_tx_fifo #(
     parameter int DEPTH = 512
 ) (
-    input  logic        clk,
-    input  logic        rst,
+    input  wire        clk,
+    input  wire        rst,
 
     // Slave payload stream + metadata
-    input  logic        s_tvalid,
-    input  logic [7:0]  s_tdata,
-    input  logic        s_tlast,
-    output logic        s_tready,
-    input  logic [7:0]  s_channel,
-    input  logic [7:0]  s_flags,
-    input  logic [15:0] s_seq,
-    input  logic [15:0] s_payload_len,
+    input  wire        s_tvalid,
+    input  wire [7:0]  s_tdata,
+    input  wire        s_tlast,
+    output wire        s_tready,
+    input  wire [7:0]  s_channel,
+    input  wire [7:0]  s_flags,
+    input  wire [15:0] s_seq,
+    input  wire [15:0] s_payload_len,
+    input  wire        s_tdest,
 
     // Master payload stream + metadata
-    output logic        m_tvalid,
-    output logic [7:0]  m_tdata,
-    output logic        m_tlast,
-    input  logic        m_tready,
-    output logic [7:0]  m_channel,
-    output logic [7:0]  m_flags,
-    output logic [15:0] m_seq,
-    output logic [15:0] m_payload_len,
+    output wire        m_tvalid,
+    output wire [7:0]  m_tdata,
+    output wire        m_tlast,
+    input  wire        m_tready,
+    output wire [7:0]  m_channel,
+    output wire [7:0]  m_flags,
+    output wire [15:0] m_seq,
+    output wire [15:0] m_payload_len,
+    output wire        m_tdest,
 
     // Status
     output logic        o_overflow,
@@ -42,6 +44,7 @@ module fcsp_tx_fifo #(
     logic [7:0]  mem_flags     [0:DEPTH-1];
     logic [15:0] mem_seq       [0:DEPTH-1];
     logic [15:0] mem_payload_len [0:DEPTH-1];
+    logic        mem_tdest     [0:DEPTH-1];
 
     logic [ADDR_W-1:0] wr_ptr;
     logic [ADDR_W-1:0] rd_ptr;
@@ -64,6 +67,7 @@ module fcsp_tx_fifo #(
     assign m_flags       = mem_flags[rd_ptr];
     assign m_seq         = mem_seq[rd_ptr];
     assign m_payload_len = mem_payload_len[rd_ptr];
+    assign m_tdest       = mem_tdest[rd_ptr];
 
     assign push = s_tvalid && s_tready;
     assign pop  = m_tvalid && m_tready;
@@ -90,6 +94,7 @@ module fcsp_tx_fifo #(
                 mem_flags[wr_ptr]       <= s_flags;
                 mem_seq[wr_ptr]         <= s_seq;
                 mem_payload_len[wr_ptr] <= s_payload_len;
+                mem_tdest[wr_ptr]       <= s_tdest;
                 wr_ptr                  <= wr_ptr + 1'b1;
             end
 

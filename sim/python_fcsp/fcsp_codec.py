@@ -48,6 +48,12 @@ class ResultCode(IntEnum):
     INTERNAL_ERROR = 0x06
 
 
+class EndpointRole(IntEnum):
+    OFFLOADER = 0x01
+    FLIGHT_CONTROLLER = 0x02
+    SIM = 0x03
+
+
 class Space(IntEnum):
     FC_REG = 0x01
     ESC_EEPROM = 0x02
@@ -57,6 +63,32 @@ class Space(IntEnum):
     DSHOT_IO = 0x11
     LED_IO = 0x12
     NEO_IO = 0x13
+
+
+# ---------------------------------------------------------------------------
+# HELLO TLV type constants
+# ---------------------------------------------------------------------------
+HELLO_TLV_ENDPOINT_ROLE = 0x01
+HELLO_TLV_ENDPOINT_NAME = 0x02
+HELLO_TLV_PROTOCOL_STRING = 0x03
+HELLO_TLV_PROFILE_STRING = 0x04
+HELLO_TLV_INSTANCE_ID = 0x05
+HELLO_TLV_UPTIME_MS = 0x06
+
+# ---------------------------------------------------------------------------
+# Capability TLV type constants
+# ---------------------------------------------------------------------------
+CAP_TLV_SUPPORTED_OPS = 0x01
+CAP_TLV_SUPPORTED_SPACES = 0x02
+CAP_TLV_MAX_READ_BLOCK_LEN = 0x03
+CAP_TLV_MAX_WRITE_BLOCK_LEN = 0x04
+CAP_TLV_PROFILE_STRING = 0x05
+CAP_TLV_FEATURE_FLAGS = 0x06
+CAP_TLV_PWM_CHANNEL_COUNT = 0x10
+CAP_TLV_DSHOT_MOTOR_COUNT = 0x11
+CAP_TLV_LED_COUNT = 0x12
+CAP_TLV_NEOPIXEL_COUNT = 0x13
+CAP_TLV_SUPPORTED_IO_SPACES = 0x14
 
 
 @dataclass(frozen=True)
@@ -333,3 +365,160 @@ class StreamParser:
             return self._buf.index(FCSP_SYNC)
         except ValueError:
             return -1
+
+
+# ---------------------------------------------------------------------------
+# Summary dataclasses  (ported from esc-configurator comm_proto/fcsp.py)
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class HelloSummary:
+    endpoint_role: int | None
+    endpoint_name: str
+    protocol_string: str
+    profile_string: str
+    instance_id: int | None
+    uptime_ms: int | None
+    entries: tuple[Tlv, ...]
+
+
+@dataclass(frozen=True)
+class CapabilitySummary:
+    supported_ops_bitmap: bytes | None
+    supported_spaces_bitmap: bytes | None
+    max_read_block_length: int | None
+    max_write_block_length: int | None
+    profile_string: str
+    feature_flags: int | None
+    pwm_channel_count: int | None
+    dshot_motor_count: int | None
+    led_count: int | None
+    neopixel_count: int | None
+    supported_io_spaces_bitmap: bytes | None
+    entries: tuple[Tlv, ...]
+
+
+def summarize_hello_tlvs(entries: list[Tlv]) -> HelloSummary:
+    endpoint_role: int | None = None
+    endpoint_name = ""
+    protocol_string = ""
+    profile_string = ""
+    instance_id: int | None = None
+    uptime_ms: int | None = None
+
+    for entry in entries:
+        value = bytes(entry.value)
+        if entry.tlv_type == HELLO_TLV_ENDPOINT_ROLE and value:
+            endpoint_role = int(value[0])
+        elif entry.tlv_type == HELLO_TLV_ENDPOINT_NAME:
+            endpoint_name = value.decode("utf-8", errors="replace")
+        elif entry.tlv_type == HELLO_TLV_PROTOCOL_STRING:
+            protocol_string = value.decode("utf-8", errors="replace")
+        elif entry.tlv_type == HELLO_TLV_PROFILE_STRING:
+            profile_string = value.decode("utf-8", errors="replace")
+        elif entry.tlv_type == HELLO_TLV_INSTANCE_ID and value:
+            instance_id = int.from_bytes(value, "big")
+        elif entry.tlv_type == HELLO_TLV_UPTIME_MS and value:
+            uptime_ms = int.from_bytes(value, "big")
+
+    return HelloSummary(
+        endpoint_role=endpoint_role,
+        endpoint_name=endpoint_name,
+        protocol_string=protocol_string,
+        profile_string=profile_string,
+        instance_id=instance_id,
+        uptime_ms=uptime_ms,
+        entries=tuple(entries),
+    )
+
+
+def summarize_capability_tlvs(entries: list[Tlv]) -> CapabilitySummary:
+    supported_ops_bitmap: bytes | None = None
+    supported_spaces_bitmap: bytes | None = None
+    max_read_block_length: int | None = None
+    max_write_block_length: int | None = None
+    profile_string = ""
+    feature_flags: int | None = None
+    pwm_channel_count: int | None = None
+    dshot_motor_count: int | None = None
+    led_count: int | None = None
+    neopixel_count: int | None = None
+    supported_io_spaces_bitmap: bytes | None = None
+    for entry in entries:
+        value = bytes(entry.value)
+        if entry.tlv_type == CAP_TLV_SUPPORTED_OPS:
+            supported_ops_bitmap = value
+        elif entry.tlv_type == CAP_TLV_SUPPORTED_SPACES:
+            supported_spaces_bitmap = value
+        elif entry.tlv_type == CAP_TLV_MAX_READ_BLOCK_LEN and value:
+            max_read_block_length = int.from_bytes(value, "big")
+        elif entry.tlv_type == CAP_TLV_MAX_WRITE_BLOCK_LEN and value:
+            max_write_block_length = int.from_bytes(value, "big")
+        elif entry.tlv_type == CAP_TLV_PROFILE_STRING:
+            profile_string = value.decode("utf-8", errors="replace")
+        elif entry.tlv_type == CAP_TLV_FEATURE_FLAGS and value:
+            feature_flags = int.from_bytes(value, "big")
+        elif entry.tlv_type == CAP_TLV_PWM_CHANNEL_COUNT and value:
+            pwm_channel_count = int.from_bytes(value, "big")
+        elif entry.tlv_type == CAP_TLV_DSHOT_MOTOR_COUNT and value:
+            dshot_motor_count = int.from_bytes(value, "big")
+        elif entry.tlv_type == CAP_TLV_LED_COUNT and value:
+            led_count = int.from_bytes(value, "big")
+        elif entry.tlv_type == CAP_TLV_NEOPIXEL_COUNT and value:
+            neopixel_count = int.from_bytes(value, "big")
+        elif entry.tlv_type == CAP_TLV_SUPPORTED_IO_SPACES:
+            supported_io_spaces_bitmap = value
+    return CapabilitySummary(
+        supported_ops_bitmap=supported_ops_bitmap,
+        supported_spaces_bitmap=supported_spaces_bitmap,
+        max_read_block_length=max_read_block_length,
+        max_write_block_length=max_write_block_length,
+        profile_string=profile_string,
+        feature_flags=feature_flags,
+        pwm_channel_count=pwm_channel_count,
+        dshot_motor_count=dshot_motor_count,
+        led_count=led_count,
+        neopixel_count=neopixel_count,
+        supported_io_spaces_bitmap=supported_io_spaces_bitmap,
+        entries=tuple(entries),
+    )
+
+
+def format_capability_tlv(entry: Tlv) -> str:
+    label = {
+        CAP_TLV_SUPPORTED_OPS: "Supported ops bitmap",
+        CAP_TLV_SUPPORTED_SPACES: "Supported spaces bitmap",
+        CAP_TLV_MAX_READ_BLOCK_LEN: "Max read block length",
+        CAP_TLV_MAX_WRITE_BLOCK_LEN: "Max write block length",
+        CAP_TLV_PROFILE_STRING: "Profile string",
+        CAP_TLV_FEATURE_FLAGS: "Feature flags",
+        CAP_TLV_PWM_CHANNEL_COUNT: "PWM channel count",
+        CAP_TLV_DSHOT_MOTOR_COUNT: "DSHOT motor count",
+        CAP_TLV_LED_COUNT: "LED count",
+        CAP_TLV_NEOPIXEL_COUNT: "NeoPixel count",
+        CAP_TLV_SUPPORTED_IO_SPACES: "Supported IO spaces bitmap",
+    }.get(entry.tlv_type, f"TLV 0x{entry.tlv_type:02X}")
+
+    value = bytes(entry.value)
+    if not value:
+        return f"{label}: <empty>"
+    if entry.tlv_type in {
+        CAP_TLV_MAX_READ_BLOCK_LEN,
+        CAP_TLV_MAX_WRITE_BLOCK_LEN,
+        CAP_TLV_PWM_CHANNEL_COUNT,
+        CAP_TLV_DSHOT_MOTOR_COUNT,
+        CAP_TLV_LED_COUNT,
+        CAP_TLV_NEOPIXEL_COUNT,
+    }:
+        return f"{label}: {int.from_bytes(value, 'big')}"
+    if entry.tlv_type == CAP_TLV_FEATURE_FLAGS:
+        numeric = int.from_bytes(value, "big")
+        return f"{label}: 0x{numeric:0{max(2, len(value) * 2)}X}"
+    if entry.tlv_type in {CAP_TLV_SUPPORTED_OPS, CAP_TLV_SUPPORTED_SPACES, CAP_TLV_SUPPORTED_IO_SPACES}:
+        return f"{label}: {value.hex(' ').upper()}"
+    if all(32 <= byte < 127 for byte in value):
+        return f"{label}: {value.decode('ascii', errors='replace')}"
+    if len(value) <= 4:
+        numeric = int.from_bytes(value, "big")
+        return f"{label}: 0x{numeric:0{max(2, len(value) * 2)}X} ({numeric})"
+    return f"{label}: {value.hex(' ').upper()}"

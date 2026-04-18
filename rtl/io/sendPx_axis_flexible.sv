@@ -6,18 +6,18 @@
 //
 // Source: /media/tcmichals/projects/Tang9K/HacksterIO/SPIQuadCopter/neoPXStrip/sendPx_axis_flexible.sv
 
-`default_nettype none
+`default_nettype wire
 
 module sendPx_axis_flexible #(
     parameter int CLK_FREQ_HZ = 54_000_000,
     parameter int LED_TYPE    = 0   // 0 = WS2812 (24-bit RGB), 1 = SK6812 (32-bit RGBW)
 ) (
-    input  logic        clk,
-    input  logic        rst,
-    input  logic [31:0] s_axis_tdata,
-    input  logic        s_axis_tvalid,
-    input  logic        s_axis_tlast,
-    output logic        s_axis_tready,
+    input  wire        clk,
+    input  wire        rst,
+    input  wire [31:0] s_axis_tdata,
+    input  wire        s_axis_tvalid,
+    input  wire        s_axis_tlast,
+    output wire        s_axis_tready,
     output logic        o_serial
 );
 

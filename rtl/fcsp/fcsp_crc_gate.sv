@@ -1,4 +1,4 @@
-`default_nettype none
+`default_nettype wire
 
 // FCSP CRC validation gate
 //
@@ -7,32 +7,32 @@
 module fcsp_crc_gate #(
     parameter int MAX_PAYLOAD_LEN = 512
 ) (
-    input  logic        clk,
-    input  logic        rst,
+    input  wire        clk,
+    input  wire        rst,
 
     // Parsed frame payload + metadata from parser
-    input  logic        s_frame_tvalid,
-    input  logic [7:0]  s_frame_tdata,
-    input  logic        s_frame_tlast,
-    output logic        s_frame_tready,
-    input  logic [7:0]  s_frame_version,
-    input  logic [7:0]  s_frame_channel,
-    input  logic [7:0]  s_frame_flags,
-    input  logic [15:0] s_frame_seq,
-    input  logic [15:0] s_frame_payload_len,
-    input  logic [15:0] s_frame_recv_crc,
-    input  logic        s_frame_done,
+    input  wire        s_frame_tvalid,
+    input  wire [7:0]  s_frame_tdata,
+    input  wire        s_frame_tlast,
+    output wire        s_frame_tready,
+    input  wire [7:0]  s_frame_version,
+    input  wire [7:0]  s_frame_channel,
+    input  wire [7:0]  s_frame_flags,
+    input  wire [15:0] s_frame_seq,
+    input  wire [15:0] s_frame_payload_len,
+    input  wire [15:0] s_frame_recv_crc,
+    input  wire        s_frame_done,
 
     // CRC-clean frame payload + metadata toward router
-    output logic        m_frame_tvalid,
-    output logic [7:0]  m_frame_tdata,
-    output logic        m_frame_tlast,
-    input  logic        m_frame_tready,
-    output logic [7:0]  m_frame_version,
-    output logic [7:0]  m_frame_channel,
-    output logic [7:0]  m_frame_flags,
-    output logic [15:0] m_frame_seq,
-    output logic [15:0] m_frame_payload_len,
+    output wire        m_frame_tvalid,
+    output wire [7:0]  m_frame_tdata,
+    output wire        m_frame_tlast,
+    input  wire        m_frame_tready,
+    output wire [7:0]  m_frame_version,
+    output wire [7:0]  m_frame_channel,
+    output wire [7:0]  m_frame_flags,
+    output wire [15:0] m_frame_seq,
+    output wire [15:0] m_frame_payload_len,
 
     // Status pulses
     output logic        o_crc_valid,

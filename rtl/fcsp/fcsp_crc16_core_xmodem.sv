@@ -1,4 +1,4 @@
-`default_nettype none
+`default_nettype wire
 
 // Combinational CRC16-XMODEM (poly 0x1021), byte step function.
 // Ported from proven legacy implementation and wrapped for FCSP use.

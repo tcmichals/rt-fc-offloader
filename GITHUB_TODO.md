@@ -42,8 +42,13 @@
 - [x] Add E2E NeoPixel write+trigger tests — 2 tests (single pixel, multi pixel)
 - [x] Add E2E BLHeli boot sequence tests — 2 tests (force low/release, ESC data after boot)
 - [x] Add E2E SPI TX egress tests — 2 tests (PING mirror, CS-high passthrough)
+- [x] Add ESC traffic generator — `sim/cocotb/esc_traffic_gen.py` with BLHeli 4-way helpers + simulator class
 - [x] Add ESC protocol test suite — 5 tests (BLHeli 4-way framing, multi-byte, baud config, channel switch)
 - [x] Add ESC traffic generator — `sim/cocotb/esc_traffic_gen.py` with BLHeli 4-way helpers + simulator class
+
+## Advanced AXIS Verification & Testbench Modernization
+
+- [ ] Leverage AXIS switch-fabric design details (TID/TDEST/TLAST) to modernize integration testbenches and automate regression verification.
 
 ## 50 MHz control-path target checks
 

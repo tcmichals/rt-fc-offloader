@@ -9,27 +9,27 @@
 //
 // Source: /media/tcmichals/projects/Tang9K/HacksterIO/SPIQuadCopter/neoPXStrip/wb_neoPx.v
 
-`default_nettype none
+`default_nettype wire
 
 module wb_neoPx #(
     parameter int CLK_FREQ_HZ = 54_000_000,
     parameter int LED_TYPE    = 0           // 0=WS2812, 1=SK6812
 ) (
-    input  logic        clk,
-    input  logic        rst,
+    input  wire        clk,
+    input  wire        rst,
 
     // Wishbone slave
-    input  logic [31:0] wb_adr_i,
-    input  logic [31:0] wb_dat_i,
-    output logic [31:0] wb_dat_o,
-    input  logic        wb_we_i,
-    input  logic [3:0]  wb_sel_i,
-    input  logic        wb_stb_i,
-    input  logic        wb_cyc_i,
-    output logic        wb_ack_o,
+    input  wire [31:0] wb_adr_i,
+    input  wire [31:0] wb_dat_i,
+    output wire [31:0] wb_dat_o,
+    input  wire        wb_we_i,
+    input  wire [3:0]  wb_sel_i,
+    input  wire        wb_stb_i,
+    input  wire        wb_cyc_i,
+    output wire        wb_ack_o,
 
     // NeoPixel serial output
-    output logic        o_serial
+    output wire        o_serial
 );
 
     // Pixel buffer (8 × 32-bit)

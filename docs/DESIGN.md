@@ -132,7 +132,30 @@ Both transports feed the same `fcsp_parser` — the protocol engine is transport
 
 > **See also:** [FCSP_SPI_TRANSPORT.md](FCSP_SPI_TRANSPORT.md) for the full transport profile spec.
 
-### 2.3 Wishbone B3 Internal Bus
+### 2.3 Internal Switch Fabric & AXIS Mapping
+
+The offloader's internal datapath is structured as a **hardware switch**. Data moves through the system using AXI-Stream (AXIS) interfaces with stateful transaction tracking.
+
+> **Detailed Specification:** [SWITCH_ARCHITECTURE.md](SWITCH_ARCHITECTURE.md) — How the protocol maps to AXIS, and how Transaction ID (TID) tracking ensures responses are routed correctly.
+
+---
+
+## 3. Best Practices & Common Gotchas
+
+To ensure Verilator compliance and hardware stability, the following rules apply to all new RTL development in this repository.
+
+### 3.1 Verilator Compatibility
+- **Type `logic` only:** Use `logic` for all ports and internal signals. Avoid `wire` or `reg`. This prevents `PROCASSWIRE` errors when procedurally assigning to outputs in state machines.
+- **No Inferred Latches:** Every `always_comb` block must specify default assignments for all driven signals at the start of the block.
+- **Top-Level Linting:** Always run `make test-all-strict` (or the `sim-test-all-strict` CMake target) to catch linting errors before synthesis.
+
+### 3.2 State Machine Design
+- **Payload Draining:** Frame-oriented state machines must always drain payloads until `TLAST` is seen, even if the payload is invalid or unexpected (e.g., in `OP_PING`). This prevents FIFO desynchronization.
+- **Stateful Responses:** Use the `TID` signal to latch the request source. Ensure the response frame sets its `TDEST` to match the latched `TID`.
+
+---
+
+## 4. Wishbone B3 Internal Bus
 
 | Property | Value |
 |----------|-------|
@@ -1409,3 +1432,55 @@ The router's CH 0x04 *ingress* output (`m_dbg_tready = 1'b1`) is tied off — th
 | [TIMING_REPORT.md](TIMING_REPORT.md) | Evidence | Timing analysis and compile snapshots |
 | [../REQUIREMENTS.md](../REQUIREMENTS.md) | Governance | Mission, must-haves, MSP↔FCSP mapping, quality gates |
 | [../GITHUB_TODO.md](../GITHUB_TODO.md) | Tracking | Open tasks, IO IP port plan, integration milestones |
+
+---
+
+## 7. Stateful Return-Path Routing (TID/TDEST)
+
+To support multiple ingress ports (USB Serial, SPI) sharing the same internal processing engines (Wishbone Master, ESC UART), a stateful routing mechanism is implemented using AXI-Stream sideband signals.
+
+### 7.1 Port Identification (TID)
+At the ingress of the offloader, each frame is tagged with a **TID (Transaction ID)**:
+- **TID = 0**: Forwarded from USB Serial.
+- **TID = 1**: Forwarded from SPI.
+
+This TID is propagated through the elastic FIFOs () alongside the frame metadata.
+
+### 7.2 Response Routing (TDEST)
+Processing modules latch the TID of the request frame and drive the **TDEST (Destination ID)** of the response frame.
+- **Wishbone Master**: Latches TID when a command is received; uses it as TDEST for the response frame.
+- **ESC UART**: Latches TID of the last received CH 0x05 frame; result packets for that channel use the latched TID as TDEST.
+
+### 7.3 Egress Demultiplexing
+The TX Framer latches the TDEST of the outgoing frame. The physical egress logic in  uses this to route bytes:
+- **TDEST = 0**: Routes to USB Serial TX.
+- **TDEST = 1**: Routes to SPI MISO (only when SPI CS is active).
+
+### 7.4 Debug Isolation
+Internal debug generators (e.g., Trace, Status) are hard-wired to **TDEST = 0**. This ensures that background debug traffic never consumes SPI bandwidth or interferes with latency-sensitive flight control data on the SPI bus.
+
+---
+
+## 7. Stateful Return-Path Routing (TID/TDEST)
+
+To support multiple ingress ports (USB Serial, SPI) sharing the same internal processing engines (Wishbone Master, ESC UART), a stateful routing mechanism is implemented using AXI-Stream sideband signals.
+
+### 7.1 Port Identification (TID)
+At the ingress of the offloader, each frame is tagged with a **TID (Transaction ID)**:
+- **TID = 0**: Forwarded from USB Serial.
+- **TID = 1**: Forwarded from SPI.
+
+This TID is propagated through the elastic FIFOs (`fcsp_rx_fifo`) alongside the frame metadata.
+
+### 7.2 Response Routing (TDEST)
+Processing modules latch the TID of the request frame and drive the **TDEST (Destination ID)** of the response frame.
+- **Wishbone Master**: Latches TID when a command is received; uses it as TDEST for the response frame.
+- **ESC UART**: Latches TID of the last received CH 0x05 frame; result packets for that channel use the latched TID as TDEST.
+
+### 7.3 Egress Demultiplexing
+The TX Framer latches the TDEST of the outgoing frame. The physical egress logic in `fcsp_offloader_top` uses this to route bytes:
+- **TDEST = 0**: Routes to USB Serial TX.
+- **TDEST = 1**: Routes to SPI MISO (only when SPI CS is active).
+
+### 7.4 Debug Isolation
+Internal debug generators (e.g., Trace, Status) are hard-wired to **TDEST = 0**. This ensures that background debug traffic never consumes SPI bandwidth or interferes with latency-sensitive flight control data on the SPI bus.

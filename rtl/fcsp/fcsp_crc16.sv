@@ -1,17 +1,17 @@
-`default_nettype none
+`default_nettype wire
 
 module fcsp_crc16 (
-    input  logic        clk,
-    input  logic        rst,
+    input  wire        clk,
+    input  wire        rst,
 
     // Stream control
-    input  logic        i_frame_start,
-    input  logic        i_data_valid,
-    input  logic [7:0]  i_data_byte,
-    input  logic        i_frame_end,
+    input  wire        i_frame_start,
+    input  wire        i_data_valid,
+    input  wire [7:0]  i_data_byte,
+    input  wire        i_frame_end,
 
     // Received CRC from wire for compare when frame ends
-    input  logic [15:0] i_recv_crc,
+    input  wire [15:0] i_recv_crc,
 
     // Status
     output logic [15:0] o_crc_value,

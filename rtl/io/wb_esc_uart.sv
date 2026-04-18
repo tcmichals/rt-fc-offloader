@@ -12,35 +12,35 @@
 //
 // Source: /media/tcmichals/projects/Tang9K/HacksterIO/SPIQuadCopter/src/wb_esc_uart.sv
 
-`default_nettype none
+`default_nettype wire
 
 module wb_esc_uart #(
     parameter int CLK_FREQ_HZ = 54_000_000
 ) (
-    input  logic        clk,
-    input  logic        rst,
+    input  wire        clk,
+    input  wire        rst,
 
     // Wishbone slave
-    input  logic [3:0]  wb_adr_i,
-    input  logic [31:0] wb_dat_i,
+    input  wire  [3:0] wb_adr_i,
+    input  wire [31:0] wb_dat_i,
     output logic [31:0] wb_dat_o,
-    input  logic        wb_we_i,
-    input  logic        wb_stb_i,
-    input  logic        wb_cyc_i,
+    input  wire        wb_we_i,
+    input  wire        wb_stb_i,
+    input  wire        wb_cyc_i,
     output logic        wb_ack_o,
 
     // Half-duplex serial
     output logic        tx_out,
-    input  logic        rx_in,
+    input  wire        rx_in,
     output logic        tx_active,
 
     // Hardware Stream Interface (FCSP CH 0x05 bypass)
-    input  logic [7:0]  s_esc_tdata,
-    input  logic        s_esc_tvalid,
+    input  wire [7:0]  s_esc_tdata,
+    input  wire        s_esc_tvalid,
     output logic        s_esc_tready,
     output logic [7:0]  m_esc_tdata,
     output logic        m_esc_tvalid,
-    input  logic        m_esc_tready
+    input  wire        m_esc_tready
 );
 
     // Default baud rate

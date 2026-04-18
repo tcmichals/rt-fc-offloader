@@ -1,4 +1,4 @@
-`default_nettype none
+`default_nettype wire
 
 // FCSP offloader top — production integration
 //
@@ -11,72 +11,72 @@ module fcsp_offloader_top #(
     parameter int MAX_PAYLOAD_LEN = 512,
     parameter int CLK_FREQ_HZ    = 54_000_000
 ) (
-    input  logic                    clk,
-    input  logic                    rst,
+    input  wire                    clk,
+    input  wire                    rst,
 
     // SPI pins
-    input  logic                    i_spi_sclk,
-    input  logic                    i_spi_cs_n,
-    input  logic                    i_spi_mosi,
-    output logic                    o_spi_miso,
+    input  wire                    i_spi_sclk,
+    input  wire                    i_spi_cs_n,
+    input  wire                    i_spi_mosi,
+    output wire                    o_spi_miso,
 
     // Optional USB-serial byte stream ingress/egress (already CDC-adapted)
-    input  logic                    i_usb_rx_valid,
-    input  logic [7:0]              i_usb_rx_byte,
-    output logic                    o_usb_rx_ready,
-    output logic                    o_usb_tx_valid,
-    output logic [7:0]              o_usb_tx_byte,
-    input  logic                    i_usb_tx_ready,
+    input  wire                    i_usb_rx_valid,
+    input  wire [7:0]              i_usb_rx_byte,
+    output logic                   o_usb_rx_ready,
+    output wire                    o_usb_tx_valid,
+    output wire [7:0]              o_usb_tx_byte,
+    input  wire                    i_usb_tx_ready,
 
     // Optional debug egress producer stream
-    input  logic                    s_dbg_tx_tvalid,
-    input  logic [7:0]              s_dbg_tx_tdata,
-    input  logic                    s_dbg_tx_tlast,
-    output logic                    s_dbg_tx_tready,
-    input  logic [7:0]              s_dbg_tx_channel,
-    input  logic [7:0]              s_dbg_tx_flags,
-    input  logic [15:0]             s_dbg_tx_seq,
+    input  wire                    s_dbg_tx_tvalid,
+    input  wire [7:0]              s_dbg_tx_tdata,
+    input  wire                    s_dbg_tx_tlast,
+    output wire                    s_dbg_tx_tready,
+    input  wire [7:0]              s_dbg_tx_channel,
+    input  wire [7:0]              s_dbg_tx_flags,
+    input  wire [15:0]             s_dbg_tx_seq,
 
     // Motor pads (bidirectional, directly to board pins)
     inout  wire  [3:0]              pad_motor,
 
     // NeoPixel serial output
-    output logic                    o_neo_data,
+    output wire                    o_neo_data,
 
     // PWM input pins (directly from board)
-    input  logic                    i_pwm_0,
-    input  logic                    i_pwm_1,
-    input  logic                    i_pwm_2,
-    input  logic                    i_pwm_3,
-    input  logic                    i_pwm_4,
-    input  logic                    i_pwm_5,
+    input  wire                    i_pwm_0,
+    input  wire                    i_pwm_1,
+    input  wire                    i_pwm_2,
+    input  wire                    i_pwm_3,
+    input  wire                    i_pwm_4,
+    input  wire                    i_pwm_5,
 
     // PC sniffer feed (from USB-UART RX path)
-    input  logic [7:0]              pc_rx_data,
-    input  logic                    pc_rx_valid,
+    input  wire [7:0]              pc_rx_data,
+    input  wire                    pc_rx_valid,
 
     // ESC UART half-duplex status
-    output logic                    o_esc_tx_active,
+    output wire                    o_esc_tx_active,
 
     // LED controller slave WB pass-through
-    output logic [31:0]             led_adr_o,
-    output logic [31:0]             led_dat_o,
-    input  logic [31:0]             led_dat_i,
-    output logic [3:0]              led_sel_o,
-    output logic                    led_we_o,
-    output logic                    led_cyc_o,
-    output logic                    led_stb_o,
-    input  logic                    led_ack_i,
+    output wire [31:0]             led_adr_o,
+    output wire [31:0]             led_dat_o,
+    input  wire [31:0]             led_dat_i,
+    output wire [3:0]              led_sel_o,
+    output wire                    led_we_o,
+    output wire                    led_cyc_o,
+    output wire                    led_stb_o,
+    input  wire                    led_ack_i,
 
     // Status visibility
-    output logic                    o_parser_sync_seen,
-    output logic                    o_parser_header_valid,
-    output logic                    o_parser_len_error,
-    output logic                    o_parser_frame_done,
-    output logic                    o_ctrl_tx_overflow,
-    output logic                    o_ctrl_tx_frame_seen,
-    output logic                    o_dbg_tx_overflow,
-    output logic                    o_dbg_tx_frame_seen
+    output wire                    o_parser_sync_seen,
+    output wire                    o_parser_header_valid,
+    output wire                    o_parser_len_error,
+    output wire                    o_parser_frame_done,
+    output wire                    o_ctrl_tx_overflow,
+    output wire                    o_ctrl_tx_frame_seen,
+    output wire                    o_dbg_tx_overflow,
+    output wire                    o_dbg_tx_frame_seen
 );
     localparam int STREAM_FIFO_DEPTH = MAX_PAYLOAD_LEN;
     localparam logic [7:0] CH_CONTROL = 8'h01;
@@ -116,6 +116,8 @@ module fcsp_offloader_top #(
     logic       ingress_ready;
 
     always_comb begin
+        // High-water mark: if USB UART has data, treat it as the active transport.
+        // Once a frame starts, the frame_from_spi logic (below) locks the routing.
         sel_usb_rx   = i_usb_rx_valid;
         ingress_byte = sel_usb_rx ? i_usb_rx_byte : spi_rx_byte;
         ingress_valid= sel_usb_rx ? i_usb_rx_valid : spi_rx_valid;
@@ -161,21 +163,22 @@ module fcsp_offloader_top #(
     logic        router_route_valid, router_route_drop;
     logic [7:0]  router_route_channel;
 
-    // ── SPI ingress channel filter ─────────────────────────────────
-    // SPI frames are restricted to CONTROL channel only.  Any non-CONTROL
-    // frame arriving via SPI is consumed (dropped) before the router.
     logic        frame_from_spi;
+    logic        ingress_tid;
     logic        spi_ingress_drop;
     logic        router_s_tready;
 
     always_ff @(posedge clk) begin
-        if (rst)
+        if (rst) begin
             frame_from_spi <= 1'b0;
-        else if (o_parser_sync_seen)
+            ingress_tid    <= 1'b0;
+        end else if (o_parser_sync_seen) begin
             frame_from_spi <= ~sel_usb_rx;
+            ingress_tid    <= ~sel_usb_rx;
+        end
     end
 
-    assign spi_ingress_drop = frame_from_spi & (crc_frame_channel != CH_CONTROL);
+    assign spi_ingress_drop = frame_from_spi & (crc_frame_channel != CH_CONTROL && crc_frame_channel != 8'h05);
     assign crc_frame_tready = spi_ingress_drop ? 1'b1 : router_s_tready;
 
     fcsp_parser #(
@@ -274,11 +277,11 @@ module fcsp_offloader_top #(
     // ------------------------------------------------------------
     // Control bridge (control-plane stream seam, both ends)
     // ------------------------------------------------------------
-    logic ctrl_rx_tvalid, ctrl_rx_tlast;
-    logic [7:0] ctrl_rx_tdata;
-    logic ctrl_rx_tready;
-    logic [7:0] ctrl_rx_channel, ctrl_rx_flags;
+    logic        ctrl_rx_tvalid, ctrl_rx_tlast, ctrl_rx_tready;
+    logic [7:0]  ctrl_rx_tdata;
+    logic [7:0]  ctrl_rx_channel, ctrl_rx_flags;
     logic [15:0] ctrl_rx_seq, ctrl_rx_payload_len;
+    logic ctrl_rx_tid;
     logic ctrl_rx_overflow, ctrl_rx_frame_seen;
 
     logic ctrl_tx_tvalid, ctrl_tx_tlast;
@@ -286,27 +289,32 @@ module fcsp_offloader_top #(
     logic ctrl_tx_tready;
     logic [7:0] ctrl_tx_meta_channel, ctrl_tx_meta_flags;
     logic [15:0] ctrl_tx_meta_seq;
+    logic        ctrl_tx_meta_tdest;
     logic        ctrl_tx_fifo_tvalid, ctrl_tx_fifo_tlast;
     logic [7:0]  ctrl_tx_fifo_tdata;
     logic        ctrl_tx_fifo_tready;
     logic [7:0]  ctrl_tx_channel, ctrl_tx_flags;
     logic [15:0] ctrl_tx_seq, ctrl_tx_payload_len;
+    logic        ctrl_tx_fifo_tdest;
     logic        ctrl_tx_overflow, ctrl_tx_frame_seen;
     logic        tx_wire_tvalid, tx_wire_tready;
     logic [7:0]  tx_wire_tdata;
     logic        tx_framer_busy, tx_framer_overflow, tx_framer_frame_done;
+    logic        tx_frame_tdest_latched;
     logic [7:0]  tx_frame_channel_latched;
-    logic        tx_route_spi_control;
+    logic        tx_route_spi;
 
     logic        tx_arb_tvalid, tx_arb_tlast, tx_arb_tready;
     logic [7:0]  tx_arb_tdata, tx_arb_channel, tx_arb_flags;
     logic [15:0] tx_arb_seq;
+    logic        tx_arb_tdest;
 
     logic        dbg_tx_fifo_tvalid, dbg_tx_fifo_tlast;
     logic [7:0]  dbg_tx_fifo_tdata;
     logic        dbg_tx_fifo_tready;
     logic [7:0]  dbg_tx_channel, dbg_tx_flags;
     logic [15:0] dbg_tx_seq, dbg_tx_payload_len;
+    logic        dbg_tx_fifo_tdest;
     logic        dbg_tx_overflow, dbg_tx_frame_seen;
 
     // ─── ESC CH 0x05 stream path ────────────────────────────────────
@@ -322,6 +330,16 @@ module fcsp_offloader_top #(
     logic        esc_pkt_tvalid;
     logic        esc_pkt_tlast;
     logic        esc_pkt_tready;
+    logic        esc_pkt_tdest;
+    logic        esc_active_tdest;
+
+    always_ff @(posedge clk) begin
+        if (rst)
+            esc_active_tdest <= 1'b0;
+        else if (router_esc_tvalid && router_esc_tready)
+            esc_active_tdest <= ingress_tid;
+    end
+    assign esc_pkt_tdest = esc_active_tdest;
 
     fcsp_rx_fifo #(
         .DEPTH(STREAM_FIFO_DEPTH)
@@ -336,6 +354,7 @@ module fcsp_offloader_top #(
         .s_flags      (crc_frame_flags),
         .s_seq        (crc_frame_seq),
         .s_payload_len(crc_frame_payload_len),
+        .s_tid        (ingress_tid),
         .m_tvalid     (ctrl_rx_tvalid),
         .m_tdata      (ctrl_rx_tdata),
         .m_tlast      (ctrl_rx_tlast),
@@ -344,6 +363,7 @@ module fcsp_offloader_top #(
         .m_flags      (ctrl_rx_flags),
         .m_seq        (ctrl_rx_seq),
         .m_payload_len(ctrl_rx_payload_len),
+        .m_tid        (ctrl_rx_tid),
         .o_overflow   (ctrl_rx_overflow),
         .o_frame_seen (ctrl_rx_frame_seen)
     );
@@ -385,10 +405,12 @@ module fcsp_offloader_top #(
         .s_cmd_tdata   (ctrl_rx_tdata),
         .s_cmd_tlast   (ctrl_rx_tlast),
         .s_cmd_tready  (ctrl_rx_tready),
+        .s_tid         (ctrl_rx_tid),
         .m_rsp_tvalid  (ctrl_tx_tvalid),
         .m_rsp_tdata   (ctrl_tx_tdata),
         .m_rsp_tlast   (ctrl_tx_tlast),
         .m_rsp_tready  (ctrl_tx_tready),
+        .m_rsp_tdest   (ctrl_tx_meta_tdest),
         .m_dbg_tvalid  (wb_dbg_tvalid_unused),
         .m_dbg_tdata   (wb_dbg_tdata_unused),
         .m_dbg_tlast   (wb_dbg_tlast_unused),
@@ -416,6 +438,7 @@ module fcsp_offloader_top #(
         .s_flags      (ctrl_tx_meta_flags),
         .s_seq        (ctrl_tx_meta_seq),
         .s_payload_len(16'h0000),
+        .s_tdest      (ctrl_tx_meta_tdest),
         .m_tvalid     (ctrl_tx_fifo_tvalid),
         .m_tdata      (ctrl_tx_fifo_tdata),
         .m_tlast      (ctrl_tx_fifo_tlast),
@@ -424,6 +447,7 @@ module fcsp_offloader_top #(
         .m_flags      (ctrl_tx_flags),
         .m_seq        (ctrl_tx_seq),
         .m_payload_len(ctrl_tx_payload_len),
+        .m_tdest      (ctrl_tx_fifo_tdest),
         .o_overflow   (ctrl_tx_overflow),
         .o_frame_seen (ctrl_tx_frame_seen)
     );
@@ -441,6 +465,7 @@ module fcsp_offloader_top #(
         .s_flags      (s_dbg_tx_flags),
         .s_seq        (s_dbg_tx_seq),
         .s_payload_len(16'h0000),
+        .s_tdest      (1'b0), // Debug/Trace always USB
         .m_tvalid     (dbg_tx_fifo_tvalid),
         .m_tdata      (dbg_tx_fifo_tdata),
         .m_tlast      (dbg_tx_fifo_tlast),
@@ -449,6 +474,7 @@ module fcsp_offloader_top #(
         .m_flags      (dbg_tx_flags),
         .m_seq        (dbg_tx_seq),
         .m_payload_len(dbg_tx_payload_len),
+        .m_tdest      (dbg_tx_fifo_tdest),
         .o_overflow   (dbg_tx_overflow),
         .o_frame_seen (dbg_tx_frame_seen)
     );
@@ -460,9 +486,7 @@ module fcsp_offloader_top #(
         .s_ctrl_tdata  (ctrl_tx_fifo_tdata),
         .s_ctrl_tlast  (ctrl_tx_fifo_tlast),
         .s_ctrl_tready (ctrl_tx_fifo_tready),
-        .s_ctrl_channel(ctrl_tx_channel),
-        .s_ctrl_flags  (ctrl_tx_flags),
-        .s_ctrl_seq    (ctrl_tx_seq),
+        .s_ctrl_tdest  (ctrl_tx_fifo_tdest),
         .s_esc_tvalid  (esc_pkt_tvalid),
         .s_esc_tdata   (esc_pkt_tdata),
         .s_esc_tlast   (esc_pkt_tlast),
@@ -470,6 +494,7 @@ module fcsp_offloader_top #(
         .s_esc_channel (8'h05),
         .s_esc_flags   (8'h00),
         .s_esc_seq     (16'h0000),
+        .s_esc_tdest   (esc_pkt_tdest),
         .s_dbg_tvalid  (dbg_tx_fifo_tvalid),
         .s_dbg_tdata   (dbg_tx_fifo_tdata),
         .s_dbg_tlast   (dbg_tx_fifo_tlast),
@@ -477,13 +502,15 @@ module fcsp_offloader_top #(
         .s_dbg_channel (dbg_tx_channel),
         .s_dbg_flags   (dbg_tx_flags),
         .s_dbg_seq     (dbg_tx_seq),
+        .s_dbg_tdest   (dbg_tx_fifo_tdest),
         .m_tvalid      (tx_arb_tvalid),
         .m_tdata       (tx_arb_tdata),
         .m_tlast       (tx_arb_tlast),
         .m_tready      (tx_arb_tready),
         .m_channel     (tx_arb_channel),
         .m_flags       (tx_arb_flags),
-        .m_seq         (tx_arb_seq)
+        .m_seq         (tx_arb_seq),
+        .m_tdest       (tx_arb_tdest)
     );
 
     fcsp_tx_framer #(
@@ -498,27 +525,17 @@ module fcsp_offloader_top #(
         .s_channel  (tx_arb_channel),
         .s_flags    (tx_arb_flags),
         .s_seq      (tx_arb_seq),
+        .s_tdest    (tx_arb_tdest),
         .m_tvalid   (tx_wire_tvalid),
         .m_tdata    (tx_wire_tdata),
         .m_tready   (tx_wire_tready),
         .o_busy     (tx_framer_busy),
         .o_overflow (tx_framer_overflow),
-        .o_frame_done(tx_framer_frame_done)
+        .o_frame_done(tx_framer_frame_done),
+        .o_frame_tdest_latched(tx_frame_tdest_latched)
     );
 
-    // Latch the channel of each frame at framer entry so physical egress
-    // routing can be channel-aware for the entire serialized frame.
-    always_ff @(posedge clk) begin
-        if (rst) begin
-            tx_frame_channel_latched <= 8'h00;
-        end else begin
-            if (!tx_framer_busy && tx_arb_tvalid && tx_arb_tready) begin
-                tx_frame_channel_latched <= tx_arb_channel;
-            end
-        end
-    end
-
-    assign tx_route_spi_control = (tx_frame_channel_latched == CH_CONTROL);
+    assign tx_route_spi = (tx_frame_tdest_latched == 1'b1);
 
     // -----------------------------
     // IO engines (Wishbone-based)
@@ -610,12 +627,14 @@ module fcsp_offloader_top #(
     assign o_usb_tx_valid = tx_wire_tvalid;
     assign o_usb_tx_byte  = tx_wire_tdata;
 
-    // SPI egress: valid only when SPI CS is active AND frame is CONTROL.
-    assign spi_tx_valid = tx_wire_tvalid & ~spi_cs_n_sync & tx_route_spi_control;
+    // SPI egress: valid only when SPI CS is active AND frame TDEST is SPI (1).
+    assign spi_tx_valid = tx_wire_tvalid && (!spi_cs_n_sync) && tx_route_spi;
     assign spi_tx_byte  = tx_wire_tdata;
 
-    // Back-pressure: USB must always be ready.  SPI gates on CS + CONTROL.
-    assign tx_wire_tready = i_usb_tx_ready & (spi_tx_ready | spi_cs_n_sync | ~tx_route_spi_control);
+    // Back-pressure logic (tx_wire_tready):
+    // - USB Serial egress is ALWAYS mandatory and must be ready.
+    // - SPI egress is only mandatory if SPI CS is asserted AND tdest is SPI. 
+    assign tx_wire_tready = i_usb_tx_ready && (spi_tx_ready || spi_cs_n_sync || !tx_route_spi);
 
     // Prevent unused warnings for observability-only wires in scaffold phase.
     logic _unused_ok;
@@ -648,12 +667,13 @@ module fcsp_offloader_top #(
                    ^ ctrl_tx_meta_seq[0] ^ tx_wire_tvalid ^ tx_wire_tready
                    ^ tx_wire_tdata[0] ^ tx_framer_busy ^ tx_framer_overflow
                    ^ tx_framer_frame_done
+                   ^ ctrl_rx_tvalid ^ ctrl_rx_tdata[0] ^ ctrl_rx_tlast
                    ^ s_dbg_tx_tvalid ^ s_dbg_tx_tdata[0] ^ s_dbg_tx_tlast
                    ^ s_dbg_tx_tready ^ s_dbg_tx_channel[0] ^ s_dbg_tx_flags[0]
                    ^ s_dbg_tx_seq[0] ^ tx_arb_tvalid ^ tx_arb_tlast
                    ^ tx_arb_tready ^ tx_arb_tdata[0] ^ tx_arb_channel[0]
                    ^ tx_arb_flags[0] ^ tx_arb_seq[0]
-                   ^ tx_frame_channel_latched[0] ^ tx_route_spi_control
+                   ^ tx_frame_channel_latched[0]
                    ^ frame_from_spi ^ spi_ingress_drop
                    ^ wb_dbg_tvalid_unused ^ wb_dbg_tdata_unused[0]
                    ^ wb_dbg_tlast_unused;

@@ -1,6 +1,16 @@
-# Tang Nano 9K Programming Guide
+# Tang Nano 9K / 20K Programming Guide
 
-This guide provides a direct build/program path for `rt-fc-offloader` on Tang Nano 9K.
+This guide provides a direct build/program path for `rt-fc-offloader` on Tang Nano 9K and Tang Nano 20K.
+
+Supported board targets:
+
+- `tangnano9k`
+- `tangnano20k`
+
+Build with:
+
+- `cmake --build build/cmake --target tangnano9k-build`
+- `cmake --build build/cmake --target tangnano20k-build`
 
 For complete download/install instructions (OSS CAD + Arm GCC + RISC-V GCC), see:
 
@@ -10,13 +20,18 @@ For complete download/install instructions (OSS CAD + Arm GCC + RISC-V GCC), see
 
 - Board wrapper RTL:
   - `rtl/fcsp/boards/tangnano9k/fcsp_tangnano9k_top.sv`
+  - `rtl/fcsp/boards/tangnano20k/fcsp_tangnano20k_top.sv`
 - Constraints:
   - `rtl/fcsp/boards/tangnano9k/tang9k.cst`
   - `rtl/fcsp/boards/tangnano9k/tang9k.sdc`
+  - `rtl/fcsp/boards/tangnano20k/tang20k.cst`
+  - `rtl/fcsp/boards/tangnano20k/tang20k.sdc`
 - Build script wrapper (optional OSS flow helper):
   - `scripts/build_tang9k_oss.sh`
+  - `scripts/build_tang20k_oss.sh`
 - Program script wrapper (optional helper):
   - `scripts/program_tang9k.sh`
+  - `scripts/program_tang20k.sh`
 
 ## Tool prerequisites
 
@@ -54,6 +69,19 @@ Optional override for custom install path:
 
 - `export OSS_TOOLS_BIN=/your/tools/bin`
 - `source scripts/oss_tools_env.sh`
+
+## Tang Nano 20K OSS CAD Suite Caveats
+
+While the core logic works great with OSS CAD Suite for the Tang Nano 20K, there are some "pro-level" caveats compared to the Tang Nano 9K:
+
+1. **The "ES" (Engineering Sample) Suffix:** Many boards ship with ES chips. The OSS suite (specifically Apicula) may not recognize this automatically.
+   - *Fix applied in our scripts:* We manually specify the production part number (`GW2AR-LV18QN88C8/I7`) and the family (`GW2A-18C`) in `nextpnr` and `gowin_pack`.
+2. **Embedded SDRAM:** The 64Mbit SDRAM is not natively "wrapped" in the open-source tools. You will need to use an open-source controller (like a LiteX core).
+3. **Hardened IP (PLLs):** You often have to instantiate these as primitives; there is no GUI "IP Generator" like in the official tool.
+4. **Timing Analysis:** It provides estimates, but for high-speed designs (e.g., >80 MHz), the official tool is more precise.
+5. **Basic Logic & BRAM/DSP:** Excellent and stable. Yosys and nextpnr handle standard RTL very efficiently, and memory/multiplier inferencing is reliable.
+
+Programming via `openFPGALoader` is the gold standard. It fully supports both SRAM and Flash targets using `-b tangnano20k`.
 
 ## Build bitstream
 

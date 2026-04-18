@@ -1,12 +1,12 @@
-`default_nettype none
+`default_nettype wire
 
 module fcsp_parser #(
     parameter int MAX_PAYLOAD_LEN = 512
 ) (
-    input  logic clk,
-    input  logic rst_n,
-    input  logic in_valid,
-    input  logic [7:0] in_byte,
+    input  wire clk,
+    input  wire rst_n,
+    input  wire in_valid,
+    input  wire [7:0] in_byte,
     output logic in_ready,
 
     // Status pulses (1 cycle)
@@ -19,10 +19,10 @@ module fcsp_parser #(
     output logic [15:0] o_payload_len,
 
     // Parsed payload stream + frame metadata
-    output logic        m_frame_tvalid,
-    output logic [7:0]  m_frame_tdata,
-    output logic        m_frame_tlast,
-    input  logic        m_frame_tready,
+    output wire        m_frame_tvalid,
+    output wire [7:0]  m_frame_tdata,
+    output wire        m_frame_tlast,
+    input  wire        m_frame_tready,
     output logic [7:0]  m_frame_version,
     output logic [7:0]  m_frame_channel,
     output logic [7:0]  m_frame_flags,

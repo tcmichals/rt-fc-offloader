@@ -1,4 +1,4 @@
-`default_nettype none
+`default_nettype wire
 
 // FCSP RX FIFO wrapper (Storage seam implementation)
 //
@@ -8,35 +8,37 @@
 module fcsp_rx_fifo #(
     parameter int DEPTH = 512
 ) (
-    input  logic        clk,
-    input  logic        rst,
+    input  wire        clk,
+    input  wire        rst,
 
     // Slave payload stream + metadata
-    input  logic        s_tvalid,
-    input  logic [7:0]  s_tdata,
-    input  logic        s_tlast,
-    output logic        s_tready,
-    input  logic [7:0]  s_channel,
-    input  logic [7:0]  s_flags,
-    input  logic [15:0] s_seq,
-    input  logic [15:0] s_payload_len,
+    input  wire        s_tvalid,
+    input  wire [7:0]  s_tdata,
+    input  wire        s_tlast,
+    output wire        s_tready,
+    input  wire [7:0]  s_channel,
+    input  wire [7:0]  s_flags,
+    input  wire [15:0] s_seq,
+    input  wire [15:0] s_payload_len,
+    input  wire        s_tid,
 
     // Master payload stream + metadata
-    output logic        m_tvalid,
-    output logic [7:0]  m_tdata,
-    output logic        m_tlast,
-    input  logic        m_tready,
-    output logic [7:0]  m_channel,
-    output logic [7:0]  m_flags,
-    output logic [15:0] m_seq,
-    output logic [15:0] m_payload_len,
+    output wire        m_tvalid,
+    output wire [7:0]  m_tdata,
+    output wire        m_tlast,
+    input  wire        m_tready,
+    output wire [7:0]  m_channel,
+    output wire [7:0]  m_flags,
+    output wire [15:0] m_seq,
+    output wire [15:0] m_payload_len,
+    output wire        m_tid,
 
     // Status
     output logic        o_overflow,
     output logic        o_frame_seen
 );
     localparam int ADDR_W = (DEPTH <= 2) ? 1 : $clog2(DEPTH);
-    localparam int DATA_W = 8 + 1 + 8 + 8 + 16 + 16; // 57 bits
+    localparam int DATA_W = 8 + 1 + 8 + 8 + 16 + 16 + 1; // 58 bits
 
     // Synchronous Memory inference array
     logic [DATA_W-1:0] mem [0:DEPTH-1];
@@ -59,7 +61,7 @@ module fcsp_rx_fifo #(
     assign read_en = (bram_count > 0) && (!valid_q || m_tready);
 
     logic [DATA_W-1:0] write_data;
-    assign write_data = {s_tdata, s_tlast, s_channel, s_flags, s_seq, s_payload_len};
+    assign write_data = {s_tdata, s_tlast, s_channel, s_flags, s_seq, s_payload_len, s_tid};
 
     // BRAM instance
     always_ff @(posedge clk) begin
@@ -115,7 +117,7 @@ module fcsp_rx_fifo #(
 
     // Interface extraction
     assign m_tvalid = valid_q;
-    assign {m_tdata, m_tlast, m_channel, m_flags, m_seq, m_payload_len} = dout;
+    assign {m_tdata, m_tlast, m_channel, m_flags, m_seq, m_payload_len, m_tid} = dout;
 
 endmodule
 

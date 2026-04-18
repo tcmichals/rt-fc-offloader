@@ -1,3 +1,0 @@
-[submodule "external/python-imgui-esc-configurator"]
-	path = external/python-imgui-esc-configurator
-	url = git@github.com:tcmichals/python-imgui-esc-configurator.git

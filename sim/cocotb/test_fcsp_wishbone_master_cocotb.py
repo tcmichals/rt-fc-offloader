@@ -43,9 +43,9 @@ _SPACE_FC_REG = 0x01
 
 async def _reset(dut):
     dut.rst.value = 1
-    dut.s_cmd_tvalid.value = 0
     dut.s_cmd_tdata.value  = 0
     dut.s_cmd_tlast.value  = 0
+    dut.s_tid.value        = 0
     dut.m_rsp_tready.value = 1
     dut.m_dbg_tready.value = 1
     dut.wb_ack_i.value     = 0
@@ -56,12 +56,13 @@ async def _reset(dut):
     await RisingEdge(dut.clk)
 
 
-async def _drive_cmd_payload(dut, payload: bytes):
+async def _drive_cmd_payload(dut, payload: bytes, tid: int = 0):
     """Drive payload bytes hand-shake on s_cmd_*, tlast on last byte."""
     for i, byte in enumerate(payload):
         dut.s_cmd_tvalid.value = 1
         dut.s_cmd_tdata.value  = byte
         dut.s_cmd_tlast.value  = int(i == len(payload) - 1)
+        dut.s_tid.value        = tid
         accepted = False
         while not accepted:
             await ReadOnly()
@@ -81,8 +82,11 @@ async def _collect_rsp_payload(dut, timeout_cycles=500):
         if bool(dut.m_rsp_tvalid.value) and bool(dut.m_rsp_tready.value):
             collected.append(int(dut.m_rsp_tdata.value))
             if bool(dut.m_rsp_tlast.value):
+                expected_tdest = getattr(dut, "_last_tid_sent", 0)
+                # Note: We should check m_rsp_tdest here or in the test cases.
+                # For simplicity, we'll return a tuple or just check it here.
                 await NextTimeStep()
-                return bytes(collected)
+                return bytes(collected), int(dut.m_rsp_tdest.value)
         await NextTimeStep()
     raise AssertionError(
         f"Response not complete within {timeout_cycles} cycles; "
@@ -112,9 +116,10 @@ async def get_caps_returns_ok(dut):
     await _reset(dut)
 
     collector = cocotb.start_soon(_collect_rsp_payload(dut))
-    await _drive_cmd_payload(dut, bytes([_OP_GET_CAPS]))
-    rsp = await with_timeout(collector, 10_000, "ns")
+    await _drive_cmd_payload(dut, bytes([_OP_GET_CAPS]), tid=1)
+    rsp, tdest = await with_timeout(collector, 10_000, "ns")
     assert rsp[0] == _RES_OK, f"Expected RES_OK, got 0x{rsp[0]:02X}"
+    assert tdest == 1, f"Expected TDEST 1, got {tdest}"
 
 
 @cocotb.test()
@@ -124,9 +129,10 @@ async def hello_returns_ok(dut):
     await _reset(dut)
 
     collector = cocotb.start_soon(_collect_rsp_payload(dut))
-    await _drive_cmd_payload(dut, bytes([_OP_HELLO]))
-    rsp = await with_timeout(collector, 10_000, "ns")
+    await _drive_cmd_payload(dut, bytes([_OP_HELLO]), tid=0)
+    rsp, tdest = await with_timeout(collector, 10_000, "ns")
     assert rsp[0] == _RES_OK, f"Expected RES_OK, got 0x{rsp[0]:02X}"
+    assert tdest == 0, f"Expected TDEST 0, got {tdest}"
 
 
 @cocotb.test()
@@ -137,7 +143,7 @@ async def unknown_op_returns_not_supported(dut):
 
     collector = cocotb.start_soon(_collect_rsp_payload(dut))
     await _drive_cmd_payload(dut, bytes([0xFF]))
-    rsp = await with_timeout(collector, 10_000, "ns")
+    rsp, _ = await with_timeout(collector, 10_000, "ns")
     assert rsp[0] == _RES_NOT_SUPPORTED, f"Expected RES_NOT_SUPPORTED, got 0x{rsp[0]:02X}"
 
 
@@ -196,7 +202,7 @@ async def read_block_returns_wb_data(dut):
     cocotb.start_soon(_wb_responder())
     collector = cocotb.start_soon(_collect_rsp_payload(dut))
     await _drive_cmd_payload(dut, _read_block_payload(target_addr, 4))
-    rsp = await with_timeout(collector, 20_000, "ns")
+    rsp, _ = await with_timeout(collector, 20_000, "ns")
 
     assert len(rsp) >= 7, f"Response too short: {rsp!r}"
     assert rsp[0] == _RES_OK, f"Expected RES_OK, got 0x{rsp[0]:02X}"
@@ -235,7 +241,7 @@ async def read_block_who_am_i_full_roundtrip(dut):
     cocotb.start_soon(_wb_responder())
     collector = cocotb.start_soon(_collect_rsp_payload(dut))
     await _drive_cmd_payload(dut, _read_block_payload(target_addr, 4))
-    rsp = await with_timeout(collector, 20_000, "ns")
+    rsp, _ = await with_timeout(collector, 20_000, "ns")
 
     assert rsp[0] == _RES_OK
     got = struct.unpack(">I", rsp[3:7])[0]
@@ -277,7 +283,7 @@ async def write_block_issues_wb_write_cycle(dut):
     cocotb.start_soon(_wb_acker())
     collector = cocotb.start_soon(_collect_rsp_payload(dut))
     await _drive_cmd_payload(dut, payload)
-    rsp = await with_timeout(collector, 20_000, "ns")
+    rsp, _ = await with_timeout(collector, 20_000, "ns")
 
     assert rsp[0] == _RES_OK, f"Expected RES_OK, got 0x{rsp[0]:02X}"
 
@@ -313,13 +319,13 @@ async def sequential_read_write_read(dut):
     # --- Write 0xA ---
     wr_collector = cocotb.start_soon(_collect_rsp_payload(dut))
     await _drive_cmd_payload(dut, _write_block_payload(addr, struct.pack(">I", 0x0000000A)))
-    wr_rsp = await with_timeout(wr_collector, 20_000, "ns")
+    wr_rsp, _ = await with_timeout(wr_collector, 20_000, "ns")
     assert wr_rsp[0] == _RES_OK, f"Write response: expected RES_OK got 0x{wr_rsp[0]:02X}"
 
     # --- Read back ---
     rd_collector = cocotb.start_soon(_collect_rsp_payload(dut))
     await _drive_cmd_payload(dut, _read_block_payload(addr, 4))
-    rd_rsp = await with_timeout(rd_collector, 20_000, "ns")
+    rd_rsp, _ = await with_timeout(rd_collector, 20_000, "ns")
     assert rd_rsp[0] == _RES_OK, f"Read response: expected RES_OK got 0x{rd_rsp[0]:02X}"
     got = struct.unpack(">I", rd_rsp[3:7])[0]
     assert got == 0x0000000A, f"Read-after-write: expected 0x0000000A, got 0x{got:08X}"

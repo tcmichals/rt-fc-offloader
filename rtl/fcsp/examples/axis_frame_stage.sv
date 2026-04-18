@@ -1,4 +1,4 @@
-`default_nettype none
+`default_nettype wire
 
 // Minimal AXIS-style frame byte stage (1-deep elastic buffer).
 //
@@ -6,20 +6,20 @@
 // - teaching/reference block for valid/ready behavior with tlast
 // - tiny reusable stage for decoupling producer/consumer timing
 module axis_frame_stage (
-    input  logic       clk,
-    input  logic       rst,
+    input  wire       clk,
+    input  wire       rst,
 
     // Input stream
-    input  logic       s_tvalid,
-    input  logic [7:0] s_tdata,
-    input  logic       s_tlast,
-    output logic       s_tready,
+    input  wire       s_tvalid,
+    input  wire [7:0] s_tdata,
+    input  wire       s_tlast,
+    output wire       s_tready,
 
     // Output stream
-    output logic       m_tvalid,
-    output logic [7:0] m_tdata,
-    output logic       m_tlast,
-    input  logic       m_tready
+    output wire       m_tvalid,
+    output wire [7:0] m_tdata,
+    output wire       m_tlast,
+    input  wire       m_tready
 );
     logic       hold_valid;
     logic [7:0] hold_data;

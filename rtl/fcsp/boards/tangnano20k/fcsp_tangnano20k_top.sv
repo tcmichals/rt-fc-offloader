@@ -1,12 +1,13 @@
 `default_nettype wire
 
-// Tang Nano 9K board wrapper for FCSP offloader top.
+// Tang Nano 20K board wrapper for FCSP offloader top.
 //
 // Notes:
-// - This wrapper is for board bring-up/programming flow.
-// - USB-UART pins are adapted through a simple UART byte-stream shim and
-//   connected to fcsp_offloader_top USB seams.
-module fcsp_tangnano9k_top (
+// - This wrapper mirrors the Tang Nano 9K bring-up flow while targeting
+//   Tang Nano 20K device support.
+// - The board-specific constraint files under rtl/fcsp/boards/tangnano20k are
+//   expected to be populated with actual Tang Nano 20K pin assignments.
+module fcsp_tangnano20k_top (
     input  wire i_clk,
     input  wire i_rst_n,
 
@@ -48,10 +49,11 @@ module fcsp_tangnano9k_top (
     // Debug pins
     output wire o_debug_0,
     output wire o_debug_1,
-    output wire o_debug_2
+    output wire o_debug_2,
+    output wire o_debug_3
 );
     parameter int LED_WIDTH = 5;
-    parameter int SYS_CLK_HZ = 54_000_000;
+    parameter int SYS_CLK_HZ = 54_000_000; // PLL: 27MHz * 2 * 16 / 16 = 54MHz
     parameter int HEARTBEAT_HZ = 2;
 
     initial begin
@@ -67,7 +69,7 @@ module fcsp_tangnano9k_top (
     end
 
     logic rst;
-    assign rst = ~i_rst_n;
+    assign rst = !pll_lock;
 
     logic usb_rx_valid;
     logic [7:0] usb_rx_byte;
@@ -103,22 +105,22 @@ module fcsp_tangnano9k_top (
                                    ? 1 : $clog2(HEARTBEAT_HALF_PERIOD_CYCLES);
     logic [HEARTBEAT_CNT_W-1:0] heartbeat_cnt;
     logic heartbeat_led_on;
-    
-    // rPLL for ~54 MHz (27MHz * 2 / 1 = 54 MHz)
+    // rPLL for 54 MHz — VCO=864MHz (27*2*16), CLKOUT=864/16=54MHz
+    logic pll_lock;
     rPLL #(
         .FCLKIN("27"),
         .IDIV_SEL(0),
         .FBDIV_SEL(1),
-        .ODIV_SEL(8),
+        .ODIV_SEL(16),
         .DYN_IDIV_SEL("false"),
         .DYN_FBDIV_SEL("false"),
         .DYN_ODIV_SEL("false"),
         .DYN_SDIV_SEL(2),
-        .DEVICE("GW1NR-9C")
+        .DEVICE("GW2AR-18")
     ) u_pll (
         .CLKIN(i_clk),
         .CLKFB(1'b0),
-        .RESET(~i_rst_n),
+        .RESET(1'b0),
         .RESET_P(1'b0),
         .FBDSEL(6'b000000),
         .IDSEL(6'b000000),
@@ -127,13 +129,12 @@ module fcsp_tangnano9k_top (
         .DUTYDA(4'b0000),
         .FDLY(4'b0000),
         .CLKOUT(sys_clk),
-        .LOCK(),
+        .LOCK(pll_lock),
         .CLKOUTP(),
         .CLKOUTD(),
         .CLKOUTD3()
     );
 
-    // UART shim connects physical USB-UART pins to offloader USB byte seam.
     fcsp_uart_byte_stream #(
         .CLK_HZ(SYS_CLK_HZ),
         .BAUD(1_000_000)
@@ -150,14 +151,8 @@ module fcsp_tangnano9k_top (
         .i_rx_ready(usb_rx_ready)
     );
 
-    // -------------------------------------------------------------------
-    // Hardware FCSP control path:
-    //   fcsp_wishbone_master now lives inside fcsp_offloader_top and
-    //   drives wb_io_bus → IO engines directly.
-    //   LED controller is the only peripheral outside the offloader.
-    // -------------------------------------------------------------------
+    // Raw sync-byte sniffer removed — use logic analyzer debug pins instead.
 
-    // LED controller pass-through from IO engines
     logic [31:0] led_adr;
     logic [31:0] led_dat_o;
     logic [31:0] led_dat_i;
@@ -187,7 +182,6 @@ module fcsp_tangnano9k_top (
         .led_out   (led_reg_out)
     );
 
-    // ESC TX active status
     logic esc_tx_active;
 
     assign dbg_tx_tvalid = 1'b0;
@@ -220,23 +214,17 @@ module fcsp_tangnano9k_top (
         .s_dbg_tx_channel(dbg_tx_channel),
         .s_dbg_tx_flags(dbg_tx_flags),
         .s_dbg_tx_seq(dbg_tx_seq),
-        // Motor pads (bidirectional)
         .pad_motor({o_motor4, o_motor3, o_motor2, o_motor1}),
-        // NeoPixel
         .o_neo_data(o_neopixel),
-        // PWM inputs
         .i_pwm_0(i_pwm_ch0),
         .i_pwm_1(i_pwm_ch1),
         .i_pwm_2(i_pwm_ch2),
         .i_pwm_3(i_pwm_ch3),
         .i_pwm_4(i_pwm_ch4),
         .i_pwm_5(i_pwm_ch5),
-        // PC sniffer (tap the USB UART RX stream)
         .pc_rx_data(usb_rx_byte),
         .pc_rx_valid(usb_rx_valid),
-        // ESC status
         .o_esc_tx_active(esc_tx_active),
-        // LED controller pass-through
         .led_adr_o(led_adr),
         .led_dat_o(led_dat_o),
         .led_dat_i(led_dat_i),
@@ -245,7 +233,6 @@ module fcsp_tangnano9k_top (
         .led_cyc_o(led_cyc),
         .led_stb_o(led_stb),
         .led_ack_i(led_ack),
-        // Status
         .o_parser_sync_seen(parser_sync_seen),
         .o_parser_header_valid(parser_header_valid),
         .o_parser_len_error(parser_len_error),
@@ -271,7 +258,7 @@ module fcsp_tangnano9k_top (
         end
     end
 
-    // LED mapping: Tang Nano 9K Active-Low (0 = ON, 1 = OFF)
+    // LED mapping: Tang Nano 20K Active-Low (0 = ON, 1 = OFF)
     assign o_led_1 = ~heartbeat_led_on;    // LED1: 2Hz Heartbeat
     // Wishbone LED controller outputs (LED_POLARITY=0 already inverts for active-low):
     assign o_led_2 = led_reg_out[0];       // LED2: WB LED[0]
@@ -284,13 +271,13 @@ module fcsp_tangnano9k_top (
     assign o_debug_0 = i_usb_uart_rx;      // CH0: raw UART RX wire
     assign o_debug_1 = usb_rx_valid;        // CH1: UART decoded a byte
     assign o_debug_2 = o_usb_uart_tx;       // CH2: raw UART TX wire
+    assign o_debug_3 = parser_sync_seen;    // CH3: parser found 0xA5
 
     logic _unused_ok;
     always_comb begin
         _unused_ok = usb_rx_ready ^ usb_tx_byte[0]
                    ^ parser_len_error ^ parser_header_valid
-                   ^ parser_frame_done ^ parser_sync_seen
-                   ^ dbg_tx_tready
+                   ^ parser_frame_done ^ dbg_tx_tready
                    ^ ctrl_tx_overflow ^ ctrl_tx_frame_seen
                    ^ dbg_tx_overflow ^ dbg_tx_frame_seen
                    ^ esc_tx_active;

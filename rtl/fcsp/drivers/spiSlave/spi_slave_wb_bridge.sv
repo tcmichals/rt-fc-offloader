@@ -17,7 +17,7 @@
  * Length must be multiple of 4 (32-bit aligned).
  */
 
-`default_nettype none
+`default_nettype wire
 
 module spi_slave_wb_bridge #(
     parameter WB_ADDR_WIDTH = 32,

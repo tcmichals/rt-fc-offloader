@@ -7,31 +7,31 @@
 //
 // Source: /media/tcmichals/projects/Tang9K/HacksterIO/SPIQuadCopter/pwmDecoder/pwmdecoder_wb.v
 
-`default_nettype none
+`default_nettype wire
 
 module pwmdecoder_wb #(
     parameter int CLK_FREQ_HZ = 54_000_000
 ) (
-    input  logic        clk,
-    input  logic        rst,
+    input  wire        clk,
+    input  wire        rst,
 
     // Wishbone slave
-    input  logic [31:0] wb_adr_i,
-    input  logic [31:0] wb_dat_i,
+    input  wire [31:0] wb_adr_i,
+    input  wire [31:0] wb_dat_i,
     output logic [31:0] wb_dat_o,
-    input  logic        wb_we_i,
-    input  logic [3:0]  wb_sel_i,
-    input  logic        wb_stb_i,
-    input  logic        wb_cyc_i,
+    input  wire        wb_we_i,
+    input  wire [3:0]  wb_sel_i,
+    input  wire        wb_stb_i,
+    input  wire        wb_cyc_i,
     output logic        wb_ack_o,
 
     // PWM input signals
-    input  logic        i_pwm_0,
-    input  logic        i_pwm_1,
-    input  logic        i_pwm_2,
-    input  logic        i_pwm_3,
-    input  logic        i_pwm_4,
-    input  logic        i_pwm_5
+    input  wire        i_pwm_0,
+    input  wire        i_pwm_1,
+    input  wire        i_pwm_2,
+    input  wire        i_pwm_3,
+    input  wire        i_pwm_4,
+    input  wire        i_pwm_5
 );
 
     // Internal signals

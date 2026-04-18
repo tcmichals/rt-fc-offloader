@@ -1,4 +1,4 @@
-`default_nettype none
+`default_nettype wire
 
 // FCSP TX framer
 //
@@ -7,27 +7,29 @@
 module fcsp_tx_framer #(
     parameter int MAX_PAYLOAD_LEN = 512
 ) (
-    input  logic        clk,
-    input  logic        rst,
+    input  wire        clk,
+    input  wire        rst,
 
     // Slave payload stream + metadata (one complete payload frame)
-    input  logic        s_tvalid,
-    input  logic [7:0]  s_tdata,
-    input  logic        s_tlast,
+    input  wire        s_tvalid,
+    input  wire [7:0]  s_tdata,
+    input  wire        s_tlast,
     output logic        s_tready,
-    input  logic [7:0]  s_channel,
-    input  logic [7:0]  s_flags,
-    input  logic [15:0] s_seq,
+    input  wire [7:0]  s_channel,
+    input  wire [7:0]  s_flags,
+    input  wire [15:0] s_seq,
+    input  wire        s_tdest,
 
     // Master byte stream (wire-format FCSP frame)
     output logic        m_tvalid,
     output logic [7:0]  m_tdata,
-    input  logic        m_tready,
+    input  wire        m_tready,
 
     // Status
     output logic        o_busy,
     output logic        o_overflow,
-    output logic        o_frame_done
+    output logic        o_frame_done,
+    output wire        o_frame_tdest_latched
 );
     localparam logic [7:0] FCSP_SYNC    = 8'hA5;
     localparam logic [7:0] FCSP_VERSION = 8'h01;
@@ -57,6 +59,7 @@ module fcsp_tx_framer #(
     logic [7:0]  frame_channel;
     logic [7:0]  frame_flags;
     logic [15:0] frame_seq;
+    logic        frame_tdest;
     logic        capture_active;
     logic        drop_frame;
 
@@ -114,6 +117,7 @@ module fcsp_tx_framer #(
             frame_channel  <= 8'h00;
             frame_flags    <= 8'h00;
             frame_seq      <= 16'h0000;
+            frame_tdest    <= 1'b0;
             capture_active <= 1'b0;
             drop_frame     <= 1'b0;
             crc_reg        <= 16'h0000;
@@ -128,6 +132,7 @@ module fcsp_tx_framer #(
                     frame_channel  <= s_channel;
                     frame_flags    <= s_flags;
                     frame_seq      <= s_seq;
+                    frame_tdest    <= s_tdest;
                     payload_count  <= 16'h0000;
                     capture_active <= 1'b1;
                     drop_frame     <= 1'b0;
@@ -219,6 +224,7 @@ module fcsp_tx_framer #(
             end
         end
     end
+    assign o_frame_tdest_latched = frame_tdest;
 endmodule
 
 `default_nettype wire

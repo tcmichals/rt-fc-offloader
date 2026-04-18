@@ -4,10 +4,10 @@ project(rt_fc_offloader NONE)
 
 option(ENABLE_SIM "Enable simulation helper targets" ON)
 
-option(ENABLE_TANG9K "Enable Tang Nano 9K helper targets" ON)
+option(ENABLE_TANG "Enable Tang Nano helper targets" ON)
 
-if(ENABLE_TANG9K)
-    include(${CMAKE_SOURCE_DIR}/cmake/tang9k.cmake)
+if(ENABLE_TANG)
+    include(${CMAKE_SOURCE_DIR}/cmake/tang.cmake)
 endif()
 
 if(ENABLE_SIM)

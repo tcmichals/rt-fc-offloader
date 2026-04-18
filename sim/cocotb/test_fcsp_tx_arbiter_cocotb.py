@@ -13,6 +13,9 @@ async def _reset(dut) -> None:
     dut.s_ctrl_tlast.value = 0
     dut.s_esc_tlast.value = 0
     dut.s_dbg_tlast.value = 0
+    dut.s_ctrl_tdest.value = 0
+    dut.s_esc_tdest.value = 0
+    dut.s_dbg_tdest.value = 0
     dut.m_tready.value = 0
     
     # Initialize data/channels
@@ -51,6 +54,7 @@ async def tx_arbiter_strict_priority(dut) -> None:
     # Assert output is CTRL
     assert bool(dut.m_tvalid.value), "m_tvalid should be high"
     assert int(dut.m_channel.value) == 0x01, f"Expected channel 1 (CTRL), got {int(dut.m_channel.value)}"
+    assert int(dut.m_tdest.value) == 0, f"Expected TDEST 0 for CTRL, got {int(dut.m_tdest.value)}"
     assert bool(dut.s_ctrl_tready.value), "CTRL stream should be ready"
 
     # End the CTRL stream
@@ -58,12 +62,16 @@ async def tx_arbiter_strict_priority(dut) -> None:
     await _cycle(dut)
     dut.s_ctrl_tvalid.value = 0
     dut.s_ctrl_tlast.value = 0
+    
+    # Set ESC TDEST to 1 for this test
+    dut.s_esc_tdest.value = 1
 
     await _cycle(dut)
 
     # Assert output is now ESC
     assert bool(dut.m_tvalid.value), "m_tvalid should be high"
     assert int(dut.m_channel.value) == 0x02, f"Expected channel 2 (ESC), got {int(dut.m_channel.value)}"
+    assert int(dut.m_tdest.value) == 1, f"Expected TDEST 1 for ESC, got {int(dut.m_tdest.value)}"
     assert bool(dut.s_esc_tready.value), "ESC stream should be ready"
     
     # End the ESC stream

@@ -1,4 +1,4 @@
-`default_nettype none
+`default_nettype wire
 
 // Minimal Wishbone register peripheral for teaching/reference purposes.
 //
@@ -8,16 +8,16 @@
 //   0x8: STATUS  (RO) bit0 = heartbeat (counter bit 8)
 //   0xC: COUNTER (RO) free-running cycle counter
 module wb_status_regs (
-    input  logic        clk,
-    input  logic        rst,
+    input  wire        clk,
+    input  wire        rst,
 
     // Wishbone classic slave
-    input  logic        wb_cyc_i,
-    input  logic        wb_stb_i,
-    input  logic        wb_we_i,
-    input  logic [3:0]  wb_sel_i,
-    input  logic [7:0]  wb_adr_i,
-    input  logic [31:0] wb_dat_i,
+    input  wire        wb_cyc_i,
+    input  wire        wb_stb_i,
+    input  wire        wb_we_i,
+    input  wire [3:0]  wb_sel_i,
+    input  wire [7:0]  wb_adr_i,
+    input  wire [31:0] wb_dat_i,
     output logic [31:0] wb_dat_o,
     output logic        wb_ack_o,
     output logic        wb_err_o

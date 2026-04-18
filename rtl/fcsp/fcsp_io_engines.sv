@@ -1,4 +1,4 @@
-`default_nettype none
+`default_nettype wire
 
 // FCSP IO engines — production integration.
 //
@@ -14,59 +14,59 @@ module fcsp_io_engines #(
     parameter int CLK_FREQ_HZ   = 54_000_000,
     parameter int NEO_LED_TYPE  = 0   // 0=WS2812, 1=SK6812
 ) (
-    input  logic        clk,
-    input  logic        rst,
+    input  wire        clk,
+    input  wire        rst,
 
     // Wishbone master interface (from fcsp_wishbone_master)
-    input  logic [31:0] wb_adr_i,
-    input  logic [31:0] wb_dat_i,
+    input  wire [31:0] wb_adr_i,
+    input  wire [31:0] wb_dat_i,
     output logic [31:0] wb_dat_o,
-    input  logic [3:0]  wb_sel_i,
-    input  logic        wb_we_i,
-    input  logic        wb_cyc_i,
-    input  logic        wb_stb_i,
+    input  wire [3:0]  wb_sel_i,
+    input  wire        wb_we_i,
+    input  wire        wb_cyc_i,
+    input  wire        wb_stb_i,
     output logic        wb_ack_o,
 
     // Motor pads (bidirectional)
     inout  wire  [3:0]  pad_motor,
 
     // NeoPixel serial output
-    output logic        o_neo_data,
+    output wire        o_neo_data,
 
     // PWM input pins (directly from board)
-    input  logic        i_pwm_0,
-    input  logic        i_pwm_1,
-    input  logic        i_pwm_2,
-    input  logic        i_pwm_3,
-    input  logic        i_pwm_4,
-    input  logic        i_pwm_5,
+    input  wire        i_pwm_0,
+    input  wire        i_pwm_1,
+    input  wire        i_pwm_2,
+    input  wire        i_pwm_3,
+    input  wire        i_pwm_4,
+    input  wire        i_pwm_5,
 
     // PC sniffer feed (from USB-UART RX path)
-    input  logic [7:0]  pc_rx_data,
-    input  logic        pc_rx_valid,
+    input  wire [7:0]  pc_rx_data,
+    input  wire        pc_rx_valid,
 
     // ESC UART half-duplex (directly to/from mux)
     // (internal wiring; exposed here only for optional external debug taps)
     output logic        o_esc_tx_active,
 
     // ESC UART stream interface (FCSP CH 0x05 passthrough)
-    input  logic [7:0]  s_esc_tdata,
-    input  logic        s_esc_tvalid,
+    input  wire [7:0]  s_esc_tdata,
+    input  wire        s_esc_tvalid,
     output logic        s_esc_tready,
     output logic [7:0]  m_esc_tdata,
     output logic        m_esc_tvalid,
-    input  logic        m_esc_tready,
+    input  wire        m_esc_tready,
 
     // LED controller slave (directly wired to wb_io_bus)
     // LED slave WB signals exposed for external LED controller hookup
     output logic [31:0] led_adr_o,
     output logic [31:0] led_dat_o,
-    input  logic [31:0] led_dat_i,
+    input  wire [31:0] led_dat_i,
     output logic [3:0]  led_sel_o,
     output logic        led_we_o,
     output logic        led_cyc_o,
     output logic        led_stb_o,
-    input  logic        led_ack_i
+    input  wire        led_ack_i
 );
 
     // ─── Internal WB wires: DShot ───────────────────────────────────

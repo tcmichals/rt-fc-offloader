@@ -1,4 +1,4 @@
-`default_nettype none
+`default_nettype wire
 
 // FCSP TX stream arbiter (frame-aware)
 //
@@ -10,44 +10,48 @@
 // Grant is held until the selected frame's tlast handshake to preserve frame
 // atomicity for downstream metadata/framing.
 module fcsp_tx_arbiter (
-    input  logic        clk,
-    input  logic        rst,
+    input  wire        clk,
+    input  wire        rst,
 
     // CONTROL input stream + metadata
-    input  logic        s_ctrl_tvalid,
-    input  logic [7:0]  s_ctrl_tdata,
-    input  logic        s_ctrl_tlast,
+    input  wire        s_ctrl_tvalid,
+    input  wire [7:0]  s_ctrl_tdata,
+    input  wire        s_ctrl_tlast,
     output logic        s_ctrl_tready,
-    input  logic [7:0]  s_ctrl_channel,
-    input  logic [7:0]  s_ctrl_flags,
-    input  logic [15:0] s_ctrl_seq,
+    input  wire [7:0]  s_ctrl_channel,
+    input  wire [7:0]  s_ctrl_flags,
+    input  wire [15:0] s_ctrl_seq,
+    input  wire        s_ctrl_tdest,
 
     // ESC_SERIAL input stream + metadata
-    input  logic        s_esc_tvalid,
-    input  logic [7:0]  s_esc_tdata,
-    input  logic        s_esc_tlast,
+    input  wire        s_esc_tvalid,
+    input  wire [7:0]  s_esc_tdata,
+    input  wire        s_esc_tlast,
     output logic        s_esc_tready,
-    input  logic [7:0]  s_esc_channel,
-    input  logic [7:0]  s_esc_flags,
-    input  logic [15:0] s_esc_seq,
+    input  wire [7:0]  s_esc_channel,
+    input  wire [7:0]  s_esc_flags,
+    input  wire [15:0] s_esc_seq,
+    input  wire        s_esc_tdest,
 
     // DEBUG input stream + metadata
-    input  logic        s_dbg_tvalid,
-    input  logic [7:0]  s_dbg_tdata,
-    input  logic        s_dbg_tlast,
+    input  wire        s_dbg_tvalid,
+    input  wire [7:0]  s_dbg_tdata,
+    input  wire        s_dbg_tlast,
     output logic        s_dbg_tready,
-    input  logic [7:0]  s_dbg_channel,
-    input  logic [7:0]  s_dbg_flags,
-    input  logic [15:0] s_dbg_seq,
+    input  wire [7:0]  s_dbg_channel,
+    input  wire [7:0]  s_dbg_flags,
+    input  wire [15:0] s_dbg_seq,
+    input  wire        s_dbg_tdest,
 
     // Selected output stream + metadata
     output logic        m_tvalid,
     output logic [7:0]  m_tdata,
     output logic        m_tlast,
-    input  logic        m_tready,
+    input  wire        m_tready,
     output logic [7:0]  m_channel,
     output logic [7:0]  m_flags,
-    output logic [15:0] m_seq
+    output logic [15:0] m_seq,
+    output logic        m_tdest
 );
     typedef enum logic [1:0] {
         SEL_NONE = 2'd0,
@@ -68,6 +72,7 @@ module fcsp_tx_arbiter (
         m_channel     = 8'h00;
         m_flags       = 8'h00;
         m_seq         = 16'h0000;
+        m_tdest       = 1'b0;
 
         unique case (sel)
             SEL_CTRL: begin
@@ -77,6 +82,7 @@ module fcsp_tx_arbiter (
                 m_channel     = s_ctrl_channel;
                 m_flags       = s_ctrl_flags;
                 m_seq         = s_ctrl_seq;
+                m_tdest       = s_ctrl_tdest;
                 s_ctrl_tready = m_tready;
             end
 
@@ -87,6 +93,7 @@ module fcsp_tx_arbiter (
                 m_channel    = s_dbg_channel;
                 m_flags      = s_dbg_flags;
                 m_seq        = s_dbg_seq;
+                m_tdest      = s_dbg_tdest;
                 s_dbg_tready = m_tready;
             end
 
@@ -97,6 +104,7 @@ module fcsp_tx_arbiter (
                 m_channel     = s_esc_channel;
                 m_flags       = s_esc_flags;
                 m_seq         = s_esc_seq;
+                m_tdest       = s_esc_tdest;
                 s_esc_tready  = m_tready;
             end
 

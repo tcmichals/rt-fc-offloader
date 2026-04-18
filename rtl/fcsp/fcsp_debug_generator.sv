@@ -1,26 +1,26 @@
-`default_nettype none
+`default_nettype wire
 
 // FCSP Hardware Debug Generator ("Soft-ILA")
 //
 // Captures internal hardware probes and sends them as FCSP Channel 0x04 frames.
 // This allows the host to see a "trace" of hardware events over USB/SPI.
 module fcsp_debug_generator (
-    input  logic        clk,
-    input  logic        rst,
+    input  wire        clk,
+    input  wire        rst,
 
     // Probe Inputs (The "Signals" we want to watch)
-    input  logic        i_passthrough_enabled,
-    input  logic        i_break_active,
-    input  logic        i_sync_loss,
-    input  logic        i_wb_cyc,
-    input  logic        i_wb_ack,
-    input  logic [7:0]  i_router_chan,
+    input  wire        i_passthrough_enabled,
+    input  wire        i_break_active,
+    input  wire        i_sync_loss,
+    input  wire        i_wb_cyc,
+    input  wire        i_wb_ack,
+    input  wire [7:0]  i_router_chan,
 
     // FCSP Stream Output (Channel 0x04)
-    output logic        m_dbg_tvalid,
-    output logic [7:0]  m_dbg_tdata,
-    output logic        m_dbg_tlast,
-    input  logic        m_dbg_tready
+    output wire        m_dbg_tvalid,
+    output wire [7:0]  m_dbg_tdata,
+    output wire        m_dbg_tlast,
+    input  wire        m_dbg_tready
 );
 
     // Snapshot Register

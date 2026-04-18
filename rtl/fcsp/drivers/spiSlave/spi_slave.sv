@@ -3,24 +3,24 @@
 module spi_slave #(
     parameter DATA_WIDTH = 8
 )(
-    input  logic                   i_clk,
-    input  logic                   i_rst,
+    input  wire                   i_clk,
+    input  wire                   i_rst,
     
     // SPI Physical Interface
-    input  logic                   i_sclk,
-    input  logic                   i_cs_n,
-    input  logic                   i_mosi,
-    output logic                   o_miso,
+    input  wire                   i_sclk,
+    input  wire                   i_cs_n,
+    input  wire                   i_mosi,
+    output wire                   o_miso,
     
     // User / System Interface
-    input  logic [DATA_WIDTH-1:0]  i_tx_data,  // Data to send
-    input  logic                   i_tx_valid, // Pulse high to load data
-    output logic                   o_tx_ready, // High = Safe to load new data
-    output logic                   o_busy,     // High = SPI transaction in progress
+    input  wire [DATA_WIDTH-1:0]  i_tx_data,  // Data to send
+    input  wire                   i_tx_valid, // Pulse high to load data
+    output wire                   o_tx_ready, // High = Safe to load new data
+    output wire                   o_busy,     // High = SPI transaction in progress
     
-    output logic [DATA_WIDTH-1:0]  o_rx_data,  // Received data
-    output logic                   o_data_valid, // High = New rx_data available
-    output logic                   o_cs_n_sync   // Synchronized CS_n output
+    output wire [DATA_WIDTH-1:0]  o_rx_data,  // Received data
+    output wire                   o_data_valid, // High = New rx_data available
+    output wire                   o_cs_n_sync   // Synchronized CS_n output
 );
 
     // --- 1. Synchronization & Edge Detection ---

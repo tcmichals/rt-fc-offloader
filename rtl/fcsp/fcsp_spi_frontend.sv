@@ -1,4 +1,4 @@
-`default_nettype none
+`default_nettype wire
 
 // FCSP SPI frontend (skeleton)
 //
@@ -7,26 +7,26 @@
 module fcsp_spi_frontend #(
     parameter int DATA_WIDTH = 8
 ) (
-    input  logic                  clk,
-    input  logic                  rst,
+    input  wire                  clk,
+    input  wire                  rst,
 
     // SPI pins
-    input  logic                  i_sclk,
-    input  logic                  i_cs_n,
-    input  logic                  i_mosi,
-    output logic                  o_miso,
+    input  wire                  i_sclk,
+    input  wire                  i_cs_n,
+    input  wire                  i_mosi,
+    output logic                 o_miso,
 
     // Core-facing RX stream
     output logic [DATA_WIDTH-1:0] o_rx_byte,
     output logic                  o_rx_valid,
-    input  logic                  i_rx_ready,
+    input  wire                  i_rx_ready,
 
     // Core-facing TX stream
-    input  logic [DATA_WIDTH-1:0] i_tx_byte,
-    input  logic                  i_tx_valid,
-    output logic                  o_tx_ready,
+    input  wire [DATA_WIDTH-1:0] i_tx_byte,
+    input  wire                  i_tx_valid,
+    output wire                  o_tx_ready,
 
-    output logic                  o_busy
+    output logic                 o_busy
 );
     // SPI mode-0 style behavior (CPOL=0, CPHA=0):
     // - sample MOSI on SCLK rising edge

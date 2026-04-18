@@ -1,4 +1,4 @@
-`default_nettype none
+`default_nettype wire
 
 // FCSP to Wishbone Master Bridge
 //
@@ -7,26 +7,28 @@
 // from the FCSP Router stream and executes direct Wishbone bus cycles
 // to memory-mapped IO engines (DSHOT, NEO, PWM).
 module fcsp_wishbone_master (
-    input  logic        clk,
-    input  logic        rst,
+    input  wire        clk,
+    input  wire        rst,
 
     // FCSP CONTROL Ingress
-    input  logic        s_cmd_tvalid,
-    input  logic [7:0]  s_cmd_tdata,
-    input  logic        s_cmd_tlast,
+    input  wire        s_cmd_tvalid,
+    input  wire [7:0]  s_cmd_tdata,
+    input  wire        s_cmd_tlast,
     output logic        s_cmd_tready,
+    input  wire        s_tid,
 
     // FCSP CONTROL Egress (Responses)
     output logic        m_rsp_tvalid,
     output logic [7:0]  m_rsp_tdata,
     output logic        m_rsp_tlast,
-    input  logic        m_rsp_tready,
+    input  wire        m_rsp_tready,
+    output logic        m_rsp_tdest,
 
     // FCSP DEBUG Egress
     output logic        m_dbg_tvalid,
     output logic [7:0]  m_dbg_tdata,
     output logic        m_dbg_tlast,
-    input  logic        m_dbg_tready,
+    input  wire        m_dbg_tready,
 
     // Wishbone Master Interface to IO Engines
     output logic [31:0] wb_adr_o,
@@ -35,8 +37,8 @@ module fcsp_wishbone_master (
     output logic        wb_we_o,
     output logic        wb_cyc_o,
     output logic        wb_stb_o,
-    input  logic        wb_ack_i,
-    input  logic [31:0] wb_dat_i
+    input  wire        wb_ack_i,
+    input  wire [31:0] wb_dat_i
 );
     localparam logic [7:0] OP_PING        = 8'h06;
     localparam logic [7:0] OP_READ_BLOCK  = 8'h10;
@@ -79,12 +81,14 @@ module fcsp_wishbone_master (
         // completes, so we latch it here for use in ST_WB_READ_EXEC /
         // ST_WB_WRITE_EXEC.
         logic cmd_was_last;
+    logic tid_latched;
 
     always_comb begin
         s_cmd_tready = 1'b0;
         m_rsp_tvalid = 1'b0;
         m_rsp_tlast  = 1'b0;
         m_rsp_tdata  = 8'h00;
+        m_rsp_tdest  = 1'b0;
 
         wb_cyc_o = 1'b0;
         wb_stb_o = 1'b0;
@@ -114,6 +118,7 @@ module fcsp_wishbone_master (
                 wb_we_o  = 1'b0;
             end
             ST_RSP_SEND: begin
+                m_rsp_tdest  = tid_latched;
                 m_rsp_tvalid = (rsp_idx < rsp_len);
                 m_rsp_tlast  = (rsp_idx + 16'd1 == rsp_len);
                 m_rsp_tdata  = (rsp_idx < 32) ? rsp_buf[rsp_idx[4:0]] : 8'h00;
@@ -137,11 +142,15 @@ module fcsp_wishbone_master (
             wb_sel_o <= 4'h0;
             wb_byte_offset <= 8'h0;
                 cmd_was_last <= 1'b0;
+            tid_latched <= 1'b0;
         end else begin
             unique case (st)
                 ST_IDLE: begin
                     if (s_cmd_tvalid) begin
                         op <= s_cmd_tdata;
+                        tid_latched <= s_tid;
+                        addr <= 32'h0;
+                        len <= 16'd0;
                         if (s_cmd_tlast) begin
                             // Handle zero-length bodies like GET_CAPS/HELLO
                             rsp_idx <= 16'd0;
@@ -176,11 +185,11 @@ module fcsp_wishbone_master (
                             byte_idx <= 2'd0;
                             st <= s_cmd_tlast ? ST_DISCARD_CMD : ST_GET_ADDR;
                         end else begin
-                            // Flush unsupported op payloads
-                            st <= s_cmd_tlast ? ST_RSP_SEND : ST_DISCARD_CMD;
-                            rsp_buf[0] <= RES_NOT_SUPPORTED;
+                            // Flush unsupported or simple op payloads (PING, HELLO, etc.)
+                            rsp_buf[0] <= (op == OP_PING || op == OP_HELLO || op == OP_GET_CAPS) ? RES_OK : RES_NOT_SUPPORTED;
                             rsp_len <= 16'd1;
                             rsp_idx <= 16'd0;
+                            st <= s_cmd_tlast ? ST_RSP_SEND : ST_DISCARD_CMD;
                         end
                     end
                 end
@@ -213,11 +222,12 @@ module fcsp_wishbone_master (
                                 wb_sel_o <= 4'h0;
                                 st <= ST_WB_WRITE_DATA;
                             end else if (op == OP_READ_BLOCK) begin
-                                    cmd_was_last <= s_cmd_tlast;
+                                cmd_was_last <= s_cmd_tlast;
                                 st <= ST_WB_READ_EXEC;
                             end
                         end else if (s_cmd_tlast) begin
-                            st <= ST_DISCARD_CMD;
+                            // Truncated header
+                            st <= ST_IDLE;
                         end
                     end
                 end
@@ -280,12 +290,16 @@ module fcsp_wishbone_master (
 
                 ST_DISCARD_CMD: begin
                     if (s_cmd_tvalid && s_cmd_tlast) begin
-                        st <= ST_RSP_SEND;
+                        st <= ST_RSP_SEND; // Done discarding, send response
+                    end else if (!s_cmd_tvalid && cmd_was_last) begin
+                        st <= ST_RSP_SEND; // Frame already ended implicitly
                     end
                 end
 
                 ST_RSP_SEND: begin
-                    if (m_rsp_tvalid && m_rsp_tready) begin
+                    if (rsp_len == 16'd0) begin
+                        st <= ST_IDLE;
+                    end else if (m_rsp_tvalid && m_rsp_tready) begin
                         if (m_rsp_tlast) begin
                             st <= ST_IDLE;
                         end else begin

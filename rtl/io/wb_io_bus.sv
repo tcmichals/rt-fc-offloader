@@ -14,82 +14,82 @@
 //
 // Unmatched addresses respond with ack + data=0 (no hang).
 
-`default_nettype none
+`default_nettype wire
 
 module wb_io_bus #(
     parameter logic [31:0] WHO_AM_I_VALUE = 32'hFC50_0002
 ) (
-    input  logic        clk,
-    input  logic        rst,
+    input  wire        clk,
+    input  wire        rst,
 
     // Wishbone master interface (from fcsp_wishbone_master)
-    input  logic [31:0] wbm_adr_i,
-    input  logic [31:0] wbm_dat_i,
+    input  wire [31:0] wbm_adr_i,
+    input  wire [31:0] wbm_dat_i,
     output logic [31:0] wbm_dat_o,
-    input  logic [3:0]  wbm_sel_i,
-    input  logic        wbm_we_i,
-    input  logic        wbm_cyc_i,
-    input  logic        wbm_stb_i,
+    input  wire [3:0]  wbm_sel_i,
+    input  wire        wbm_we_i,
+    input  wire        wbm_cyc_i,
+    input  wire        wbm_stb_i,
     output logic        wbm_ack_o,
 
     // Slave 0: DShot controller
     output logic [31:0] dshot_adr_o,
     output logic [31:0] dshot_dat_o,
-    input  logic [31:0] dshot_dat_i,
+    input  wire [31:0] dshot_dat_i,
     output logic [3:0]  dshot_sel_o,
     output logic        dshot_we_o,
     output logic        dshot_cyc_o,
     output logic        dshot_stb_o,
-    input  logic        dshot_ack_i,
+    input  wire        dshot_ack_i,
 
     // Slave 1: Serial/DShot mux
     output logic [31:0] mux_adr_o,
     output logic [31:0] mux_dat_o,
-    input  logic [31:0] mux_dat_i,
+    input  wire [31:0] mux_dat_i,
     output logic [3:0]  mux_sel_o,
     output logic        mux_we_o,
     output logic        mux_cyc_o,
     output logic        mux_stb_o,
-    input  logic        mux_ack_i,
+    input  wire        mux_ack_i,
 
     // Slave 2: NeoPixel
     output logic [31:0] neo_adr_o,
     output logic [31:0] neo_dat_o,
-    input  logic [31:0] neo_dat_i,
+    input  wire [31:0] neo_dat_i,
     output logic [3:0]  neo_sel_o,
     output logic        neo_we_o,
     output logic        neo_cyc_o,
     output logic        neo_stb_o,
-    input  logic        neo_ack_i,
+    input  wire        neo_ack_i,
 
     // Slave 3: ESC UART
     output logic [3:0]  esc_adr_o,
     output logic [31:0] esc_dat_o,
-    input  logic [31:0] esc_dat_i,
+    input  wire [31:0] esc_dat_i,
     output logic        esc_we_o,
     output logic        esc_cyc_o,
     output logic        esc_stb_o,
-    input  logic        esc_ack_i,
+    input  wire        esc_ack_i,
 
     // Slave 4: PWM decoder
     output logic [31:0] pwm_adr_o,
     output logic [31:0] pwm_dat_o,
-    input  logic [31:0] pwm_dat_i,
+    input  wire [31:0] pwm_dat_i,
     output logic [3:0]  pwm_sel_o,
     output logic        pwm_we_o,
     output logic        pwm_cyc_o,
     output logic        pwm_stb_o,
-    input  logic        pwm_ack_i,
+    input  wire        pwm_ack_i,
 
     // Slave 5: LED controller
     output logic [31:0] led_adr_o,
     output logic [31:0] led_dat_o,
-    input  logic [31:0] led_dat_i,
+    input  wire [31:0] led_dat_i,
     output logic [3:0]  led_sel_o,
     output logic        led_we_o,
     output logic        led_cyc_o,
     output logic        led_stb_o,
-    input  logic        led_ack_i
+    input  wire        led_ack_i
 );
 
     // Address decode using bits [15:8] of the 32-bit address

@@ -25,29 +25,41 @@ This document defines the FCSP/1 offloader architecture and block responsibiliti
 The design acts as a high-speed hardware switch. Packets are parsed at the "Ingress" and routed either to the **Control Plane** (Wishbone) or the **Bypass Plane** (Direct Pin Access).
 
 ```mermaid
-flowchart LR
-    HOST_SPI[SPI: Linux FC] --> MUX[Ingress Priority Mux]
-    HOST_USB[USB: Configurator] --> MUX
+flowchart TD
+    subgraph Ingress ["Ingress Fabric"]
+        HOST_SPI[SPI: Linux FC] --> MUX[Ingress Mux]
+        HOST_USB[USB: Configurator] --> MUX
+        MUX --> SRC_ID[Source Tracker\nAssign TID]
+    end
     
-    MUX --> PARSER[fcsp_parser\nSync+Header]
-    PARSER --> CRC[fcsp_crc16\nXMODEM verify]
-    CRC --> ROUTER[fcsp_router\nChannel Router]
+    subgraph Engine ["Protocol Engine"]
+        SRC_ID --> PARSER[fcsp_parser\nSync+Header]
+        PARSER --> CRC[fcsp_crc16\nXMODEM verify]
+        CRC --> ROUTER[fcsp_router\nChannel Router]
+    end
 
-    %% Channels
-    ROUTER -->|CH 0x01| WB_MASTER[fcsp_wishbone_master\nControl Plane]
-    ROUTER -->|CH 0x05| BYPASS[ESC Serial Bridge\nBypass Plane]
+    subgraph Planes ["Functional Planes"]
+        ROUTER -->|CH 0x01| WB_MASTER[fcsp_wishbone_master\nControl Plane]
+        ROUTER -->|CH 0x05| BYPASS[ESC Serial Bridge\nBypass Plane]
+        WB_MASTER -.->|Latch TID| TID_STORE[Transaction State]
+    end
 
-    %% Logic
-    WB_MASTER -.WB bus.-> BUS[Wishbone Internal Bus]
-    BUS <--> DSHOT[DShot Motor Engine]
-    BUS <--> NEO[NeoPixel Engine]
+    subgraph Peripherals ["IO Peripherals"]
+        WB_MASTER -.WB bus.-> BUS[Wishbone Internal Bus]
+        BUS <--> DSHOT[DShot Motor Engine]
+        BUS <--> NEO[NeoPixel Engine]
+        BUS -.->|Reg 0x400| PIN_MUX{Hardware Pin Mux}
+    end
     
-    %% The Hard Switch
-    BUS -.->|Reg 0x20| PIN_MUX{Hardware Pin Mux}
+    subgraph Egress ["Egress Fabric"]
+        TID_STORE -.->|Set TDEST| ARB[TX Arbiter]
+        BYPASS --> ARB
+        ARB --> FRAMER[fcsp_tx_framer\nCRC + Header]
+        FRAMER -- "Route by TDEST" --> L[Physical Wire]
+    end
+    
     BYPASS <--> PIN_MUX
-    
     PIN_MUX --> MOTORS[Physical ESC Pins]
-    ENCODER[fcsp_tx_framer] --> MUX
 ```
 
 ---
@@ -83,10 +95,20 @@ See `docs/DESIGN.md` §3–4 for the complete address map and per-peripheral reg
 
 Unlike previous designs where a CPU copied bytes between UARTs, this design uses a **hard-wired bypass**.
 
-1. **Selection**: Host writes `1` to Register `0x20`.
+1. **Selection**: Host writes `0` to Register `0x40000400` Bit 0.
 2. **Action**: The `PIN_MUX` physically disconnects the DShot pulse generator.
 3. **Link**: The selected Motor Pin is wired directly to the `ESC_SERIAL` (0x05) stream.
 4. **Timing**: The "Switch Over" happens in exactly 1 clock cycle (18.5ns), providing the perfect deterministic timing required for ESC bootloader entry.
+
+## Stateful Routing & Return-Path Tracking
+
+The design implements a **stateful switch** model to support multiple hosts (USB and SPI) simultaneously.
+
+- **TID (Transaction ID)**: At ingress, each frame is tagged with its source port ID.
+- **Latching**: The processing module (e.g., WB Master) latches the `TID` for the duration of its task.
+- **TDEST (Destination)**: The response stream inherits the latched `TID` as its `TDEST`, ensuring the egress logic routes the frame back to the correct physical port.
+
+This mechanism allows a PC Configurator (USB) to monitor registers or flash ESCs without interfering with the Flight Controller's (SPI) control loop.
 
 ---
 

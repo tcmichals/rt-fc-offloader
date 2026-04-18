@@ -37,7 +37,11 @@ Minimal bring-up from repository root:
 - `bash scripts/install_latest_tools.sh` *(optional one-shot install into `~/.tools`)*
 - `source settings.sh`
 - `cmake -S . -B build/cmake`
-- `cmake --build build/cmake --target tang9k-build`
+- `cmake --build build/cmake --target tangnano9k-build`
+  or `cmake --build build/cmake --target tangnano20k-build`
+- `cmake --build build/cmake --target tangnano9k-program-sram`
+  or `cmake --build build/cmake --target tangnano20k-program-sram`
+  *(Note: uses `openFPGALoader` to write to volatile SRAM; use `-program-flash` for persistent flash)*
 
 ## Run all simulations
 

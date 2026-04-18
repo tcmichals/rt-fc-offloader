@@ -1,4 +1,4 @@
-`default_nettype none
+`default_nettype wire
 
 // UART <-> byte-stream shim (8N1)
 //
@@ -9,28 +9,30 @@ module fcsp_uart_byte_stream #(
     parameter int CLK_HZ = 27_000_000,
     parameter int BAUD   = 1_000_000
 ) (
-    input  logic       clk,
-    input  logic       rst,
+    input  wire       clk,
+    input  wire       rst,
 
     // UART pins
-    input  logic       i_uart_rx,
-    output logic       o_uart_tx,
+    input  wire       i_uart_rx,
+    output wire       o_uart_tx,
 
     // TX byte stream (slave)
-    input  logic       i_tx_valid,
-    input  logic [7:0] i_tx_byte,
-    output logic       o_tx_ready,
+    input  wire       i_tx_valid,
+    input  wire [7:0] i_tx_byte,
+    output wire       o_tx_ready,
 
     // RX byte stream (master)
-    output logic       o_rx_valid,
-    output logic [7:0] o_rx_byte,
-    input  logic       i_rx_ready
+    output wire       o_rx_valid,
+    output wire [7:0] o_rx_byte,
+    input  wire       i_rx_ready
 );
     localparam int BAUD_DIV = (CLK_HZ + (BAUD/2)) / BAUD;
     localparam int BAUD_DIV_W = (BAUD_DIV <= 1) ? 1 : $clog2(BAUD_DIV);
     localparam int RX_START_TICKS_INT = BAUD_DIV + (BAUD_DIV/2) - 1;
+    // RX tick counter must be wide enough for the 1.5x start-bit delay
+    localparam int RX_TICK_W = (RX_START_TICKS_INT <= 1) ? 1 : $clog2(RX_START_TICKS_INT + 1);
     localparam logic [BAUD_DIV_W-1:0] BAUD_DIV_M1 = BAUD_DIV[BAUD_DIV_W-1:0] - 1'b1;
-    localparam logic [BAUD_DIV_W-1:0] RX_START_TICKS = RX_START_TICKS_INT[BAUD_DIV_W-1:0];
+    localparam logic [RX_TICK_W-1:0] RX_START_TICKS = RX_START_TICKS_INT[RX_TICK_W-1:0];
 
     // ----------------
     // TX state machine
@@ -82,7 +84,7 @@ module fcsp_uart_byte_stream #(
     logic rx_busy;
     logic [3:0] rx_bit_idx;
     logic [7:0] rx_shift;
-    logic [BAUD_DIV_W-1:0] rx_tick_cnt;
+    logic [RX_TICK_W-1:0] rx_tick_cnt;
     logic [7:0] rx_hold_byte;
     logic rx_hold_valid;
 

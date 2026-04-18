@@ -1,52 +1,52 @@
-`default_nettype none
+`default_nettype wire
 
 // FCSP channel router (skeleton)
 //
 // Accepts one packetized AXIS-like payload stream plus frame metadata and
 // routes it to a per-channel output stream.
 module fcsp_router (
-    input  logic        clk,
-    input  logic        rst,
+    input  wire        clk,
+    input  wire        rst,
 
     // Slave frame/payload stream
-    input  logic        s_frame_tvalid,
-    input  logic [7:0]  s_frame_tdata,
-    input  logic        s_frame_tlast,
+    input  wire        s_frame_tvalid,
+    input  wire [7:0]  s_frame_tdata,
+    input  wire        s_frame_tlast,
     output logic        s_frame_tready,
-    input  logic [7:0]  s_frame_channel,
-    input  logic [7:0]  s_frame_flags,
-    input  logic [15:0] s_frame_seq,
-    input  logic [15:0] s_frame_payload_len,
+    input  wire [7:0]  s_frame_channel,
+    input  wire [7:0]  s_frame_flags,
+    input  wire [15:0] s_frame_seq,
+    input  wire [15:0] s_frame_payload_len,
 
     // Master CONTROL stream
     output logic        m_ctrl_tvalid,
     output logic [7:0]  m_ctrl_tdata,
     output logic        m_ctrl_tlast,
-    input  logic        m_ctrl_tready,
+    input  wire        m_ctrl_tready,
 
     // Master TELEMETRY stream
     output logic        m_tel_tvalid,
     output logic [7:0]  m_tel_tdata,
     output logic        m_tel_tlast,
-    input  logic        m_tel_tready,
+    input  wire        m_tel_tready,
 
     // Master FC_LOG stream
     output logic        m_log_tvalid,
     output logic [7:0]  m_log_tdata,
     output logic        m_log_tlast,
-    input  logic        m_log_tready,
+    input  wire        m_log_tready,
 
     // Master DEBUG_TRACE stream
     output logic        m_dbg_tvalid,
     output logic [7:0]  m_dbg_tdata,
     output logic        m_dbg_tlast,
-    input  logic        m_dbg_tready,
+    input  wire        m_dbg_tready,
 
     // Master ESC_SERIAL stream
     output logic        m_esc_tvalid,
     output logic [7:0]  m_esc_tdata,
     output logic        m_esc_tlast,
-    input  logic        m_esc_tready,
+    input  wire        m_esc_tready,
 
     // Simple observability/status
     output logic        o_route_valid,

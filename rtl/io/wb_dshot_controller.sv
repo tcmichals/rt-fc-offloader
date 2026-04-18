@@ -13,36 +13,36 @@
 //
 // Source: /media/tcmichals/projects/Tang9K/HacksterIO/SPIQuadCopter/src/wb_dshot_controller.sv
 
-`default_nettype none
+`default_nettype wire
 
 module wb_dshot_controller #(
     parameter int CLK_FREQ_HZ  = 54_000_000,
     parameter int DEFAULT_MODE = 150
 ) (
-    input  logic        clk,
-    input  logic        rst,
+    input  wire        clk,
+    input  wire        rst,
 
     // Wishbone slave interface
-    input  logic [31:0] wb_adr_i,
-    input  logic [31:0] wb_dat_i,
+    input  wire [31:0] wb_adr_i,
+    input  wire [31:0] wb_dat_i,
     output logic [31:0] wb_dat_o,
-    input  logic        wb_we_i,
-    input  logic [3:0]  wb_sel_i,
-    input  logic        wb_stb_i,
-    input  logic        wb_cyc_i,
+    input  wire        wb_we_i,
+    input  wire [3:0]  wb_sel_i,
+    input  wire        wb_stb_i,
+    input  wire        wb_cyc_i,
     output logic        wb_ack_o,
 
     // Motor DSHOT outputs
-    output logic        motor1_o,
-    output logic        motor2_o,
-    output logic        motor3_o,
-    output logic        motor4_o,
+    output wire        motor1_o,
+    output wire        motor2_o,
+    output wire        motor3_o,
+    output wire        motor4_o,
 
     // Ready signals
-    output logic        motor1_ready,
-    output logic        motor2_ready,
-    output logic        motor3_ready,
-    output logic        motor4_ready
+    output wire        motor1_ready,
+    output wire        motor2_ready,
+    output wire        motor3_ready,
+    output wire        motor4_ready
 );
 
     // Frequency validation

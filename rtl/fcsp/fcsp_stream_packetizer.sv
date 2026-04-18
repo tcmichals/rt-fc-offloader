@@ -6,25 +6,25 @@
  * - Emits a partial frame if TIMEOUT cycles pass without new bytes.
  */
 
-`default_nettype none
+`default_nettype wire
 
 module fcsp_stream_packetizer #(
     parameter int MAX_LEN = 16,
     parameter int TIMEOUT = 1000  // Cycles (~18us at 54MHz)
 ) (
-    input  logic        clk,
-    input  logic        rst,
+    input  wire        clk,
+    input  wire        rst,
 
     // Ingress (raw bytes)
-    input  logic [7:0]  s_tdata,
-    input  logic        s_tvalid,
-    output logic        s_tready,
+    input  wire [7:0]  s_tdata,
+    input  wire        s_tvalid,
+    output wire        s_tready,
 
     // Egress (Framed payload)
     output logic [7:0]  m_tdata,
     output logic        m_tvalid,
     output logic        m_tlast,
-    input  logic        m_tready
+    input  wire        m_tready
 );
 
     logic [7:0]  mem [0:MAX_LEN-1];

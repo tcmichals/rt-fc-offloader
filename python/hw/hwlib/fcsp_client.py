@@ -189,7 +189,11 @@ class FcspControlClient:
             seen.extend(chunk)
             frames = parser.feed(chunk)
             for frame_rx in frames:
-                if frame_rx.channel != Channel.CONTROL:
+                # Temporary hardware bring-up compatibility:
+                # Some bitstreams have been observed to return CONTROL payloads
+                # with channel metadata zeroed on egress. Accept channel 0 in
+                # addition to CONTROL while preserving payload shape checks.
+                if frame_rx.channel not in (Channel.CONTROL, 0):
                     continue
                 if len(frame_rx.payload) < 7:
                     raise RuntimeError(
