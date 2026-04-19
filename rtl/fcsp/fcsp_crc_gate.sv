@@ -80,6 +80,39 @@ module fcsp_crc_gate #(
     assign stream_addr = stream_idx[PAYLOAD_IDX_W-1:0];
     assign crc_payload_addr = crc_payload_idx[PAYLOAD_IDX_W-1:0];
 
+    // -----------------------------------------------------------------
+    // Synchronous read port — enables BSRAM inference (was async/distributed)
+    // Address is set one cycle ahead; data appears on the next posedge.
+    // -----------------------------------------------------------------
+    logic [PAYLOAD_IDX_W-1:0] mem_rd_addr;
+    logic [7:0]               mem_rd_data;
+
+    always_comb begin
+        mem_rd_addr = '0;
+        case (state)
+            S_FEED_CRC: begin
+                if (crc_feed_idx < 4'd7)
+                    mem_rd_addr = '0;           // prime first payload byte
+                else
+                    mem_rd_addr = crc_payload_addr + 1'b1; // lookahead
+            end
+            S_WAIT_CRC:
+                mem_rd_addr = '0;               // prime for streaming
+            S_STREAM: begin
+                if (m_frame_tvalid && m_frame_tready)
+                    mem_rd_addr = stream_addr + 1'b1; // next byte
+                else
+                    mem_rd_addr = stream_addr;        // hold
+            end
+            default:
+                mem_rd_addr = '0;
+        endcase
+    end
+
+    always_ff @(posedge clk) begin
+        mem_rd_data <= payload_mem[mem_rd_addr];
+    end
+
     function automatic logic [7:0] crc_feed_byte(
         input logic [3:0] idx,
         input logic [7:0] version,
@@ -107,7 +140,7 @@ module fcsp_crc_gate #(
     assign s_frame_tready = (state == S_CAPTURE);
 
     assign m_frame_tvalid = (state == S_STREAM) && (stream_idx < frame_payload_len_reg);
-    assign m_frame_tdata  = payload_mem[stream_addr];
+    assign m_frame_tdata  = mem_rd_data;
     assign m_frame_tlast  = (stream_idx == (frame_payload_len_reg - 16'd1));
     assign m_frame_version = frame_version_reg;
     assign m_frame_channel = frame_channel_reg;
@@ -132,7 +165,7 @@ module fcsp_crc_gate #(
                 frame_seq_reg,
                 frame_payload_len_reg,
                 crc_payload_idx,
-                payload_mem[crc_payload_addr]
+                mem_rd_data
             );
             crc_frame_end = ((crc_feed_idx == 4'd6) && (frame_payload_len_reg == 16'd0))
                          || ((crc_feed_idx == 4'd7) && (crc_payload_idx == (frame_payload_len_reg - 16'd1)));

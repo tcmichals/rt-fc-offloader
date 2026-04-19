@@ -137,7 +137,7 @@ module fcsp_tangnano20k_top (
 
     fcsp_uart_byte_stream #(
         .CLK_HZ(SYS_CLK_HZ),
-        .BAUD(1_000_000)
+        .BAUD(2_000_000)
     ) u_usb_uart (
         .clk       (sys_clk),
         .rst       (rst),

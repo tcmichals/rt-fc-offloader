@@ -37,46 +37,45 @@ module fcsp_tx_fifo #(
     output logic        o_frame_seen
 );
     localparam int ADDR_W = (DEPTH <= 2) ? 1 : $clog2(DEPTH);
+    localparam int DATA_W = 8 + 1 + 8 + 8 + 16 + 16 + 1; // 58 bits
 
-    logic [7:0]  mem_data      [0:DEPTH-1];
-    logic        mem_last      [0:DEPTH-1];
-    logic [7:0]  mem_channel   [0:DEPTH-1];
-    logic [7:0]  mem_flags     [0:DEPTH-1];
-    logic [15:0] mem_seq       [0:DEPTH-1];
-    logic [15:0] mem_payload_len [0:DEPTH-1];
-    logic        mem_tdest     [0:DEPTH-1];
+    // Single packed memory — enables BSRAM inference
+    logic [DATA_W-1:0] mem [0:DEPTH-1];
 
     logic [ADDR_W-1:0] wr_ptr;
     logic [ADDR_W-1:0] rd_ptr;
     logic [ADDR_W:0]   count;
 
     logic push;
-    logic pop;
-    logic full;
-    logic empty;
+    logic read_en;
+    logic [DATA_W-1:0] dout;
+    logic valid_q;
 
-    assign full  = (count == DEPTH[ADDR_W:0]);
-    assign empty = (count == '0);
-
-    assign s_tready = ~full;
-    assign m_tvalid = ~empty;
-
-    assign m_tdata       = mem_data[rd_ptr];
-    assign m_tlast       = mem_last[rd_ptr];
-    assign m_channel     = mem_channel[rd_ptr];
-    assign m_flags       = mem_flags[rd_ptr];
-    assign m_seq         = mem_seq[rd_ptr];
-    assign m_payload_len = mem_payload_len[rd_ptr];
-    assign m_tdest       = mem_tdest[rd_ptr];
-
+    assign s_tready = (count < DEPTH[ADDR_W:0]);
     assign push = s_tvalid && s_tready;
-    assign pop  = m_tvalid && m_tready;
+
+    // Read from BRAM when it has elements and output register is free or consumed
+    assign read_en = (count > 0) && (!valid_q || m_tready);
+
+    logic [DATA_W-1:0] write_data;
+    assign write_data = {s_tdata, s_tlast, s_channel, s_flags, s_seq, s_payload_len, s_tdest};
+
+    // BSRAM-friendly: synchronous write + registered read
+    always_ff @(posedge clk) begin
+        if (push) begin
+            mem[wr_ptr] <= write_data;
+        end
+        if (read_en) begin
+            dout <= mem[rd_ptr];
+        end
+    end
 
     always_ff @(posedge clk) begin
         if (rst) begin
             wr_ptr       <= '0;
             rd_ptr       <= '0;
             count        <= '0;
+            valid_q      <= 1'b0;
             o_overflow   <= 1'b0;
             o_frame_seen <= 1'b0;
         end else begin
@@ -87,32 +86,34 @@ module fcsp_tx_fifo #(
                 o_overflow <= 1'b1;
             end
 
-            if (push) begin
-                mem_data[wr_ptr]        <= s_tdata;
-                mem_last[wr_ptr]        <= s_tlast;
-                mem_channel[wr_ptr]     <= s_channel;
-                mem_flags[wr_ptr]       <= s_flags;
-                mem_seq[wr_ptr]         <= s_seq;
-                mem_payload_len[wr_ptr] <= s_payload_len;
-                mem_tdest[wr_ptr]       <= s_tdest;
-                wr_ptr                  <= wr_ptr + 1'b1;
+            // valid_q register management (skid logic)
+            if (read_en) begin
+                valid_q <= 1'b1;
+            end else if (m_tready) begin
+                valid_q <= 1'b0;
             end
 
-            if (pop) begin
+            if (push) begin
+                wr_ptr <= wr_ptr + 1'b1;
+            end
+            if (read_en) begin
                 rd_ptr <= rd_ptr + 1'b1;
             end
 
-            unique case ({push, pop})
+            unique case ({push, read_en})
                 2'b10: count <= count + 1'b1;
                 2'b01: count <= count - 1'b1;
                 default: count <= count;
             endcase
 
-            if (pop && m_tlast) begin
+            if (valid_q && m_tready && m_tlast) begin
                 o_frame_seen <= 1'b1;
             end
         end
     end
+
+    assign m_tvalid = valid_q;
+    assign {m_tdata, m_tlast, m_channel, m_flags, m_seq, m_payload_len, m_tdest} = dout;
 endmodule
 
 `default_nettype wire

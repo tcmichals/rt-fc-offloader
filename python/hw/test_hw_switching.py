@@ -99,7 +99,7 @@ def run_test(port: str, baud: int, break_ms: int) -> None:
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Validate FCSP switching software path via mux register read/write")
     ap.add_argument("--port", default="/dev/ttyUSB0", help="Serial port (default: /dev/ttyUSB0)")
-    ap.add_argument("--baud", type=int, default=1_000_000, help="Baud rate (default: 1000000)")
+    ap.add_argument("--baud", type=int, default=2_000_000, help="Baud rate (default: 2000000)")
     ap.add_argument(
         "--break-ms",
         type=int,

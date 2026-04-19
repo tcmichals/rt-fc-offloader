@@ -100,6 +100,6 @@ Expose counters via CONTROL `GET_LINK_STATUS` and/or diagnostics channels.
 ## Ownership split reminder
 
 - RTL fast path: SPI byte ingest, parser, CRC, router, FIFO handling
-- SERV control plane: validated frame handling, op dispatch, policy/result codes
+- Wishbone master: validated frame handling, op dispatch, policy/result codes
 
-SERV should not parse raw SPI bytes in the hot path.
+The control plane should not parse raw SPI bytes in the hot path.

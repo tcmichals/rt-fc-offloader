@@ -88,6 +88,56 @@ Simulation-adjacent verification/evidence targets:
 - The simulation Python target (`make -C sim test-python`) is configured to prefer `.venv` automatically when present.
 - `.venv` is for Python simulation/tests/scripts only; FPGA compile/program flows still use OSS toolchain paths from `settings.sh`.
 
+### Hardware test scripts (`python/hw/`)
+
+Live hardware validation scripts that talk to the FPGA over USB-serial using the FCSP protocol. Run from `python/hw/` with the `.venv` activated.
+
+**Prerequisites:**
+- FPGA programmed and connected via USB-serial
+- `.venv` activated (`source .venv/bin/activate`)
+- Default baud is 2 Mbaud (Tang Nano 20K); use `--baud 1000000` for Tang Nano 9K
+
+**Available scripts:**
+
+| Script | Purpose |
+|--------|---------|
+| `test_hw_version_poll.py` | Poll WHO_AM_I register, measure round-trip time |
+| `test_hw_onboard_led_walk.py` | Walk onboard LEDs via Wishbone LED controller |
+| `test_hw_switching.py` | Test serial/DShot mux switching across motor channels |
+| `test_hw_neopixel.py` | Drive NeoPixel outputs via Wishbone registers |
+| `test_hw_esc_passthrough.py` | BLHeli ESC passthrough: enter bootloader, read version/settings via 4-way protocol |
+
+**Common options** (all scripts):
+```
+--port /dev/ttyUSB1    # Serial port (default: auto-detect)
+--baud 2000000         # FCSP baud rate (default: 2000000)
+```
+
+**Examples:**
+```bash
+cd python/hw
+
+# Poll WHO_AM_I with RTT measurement
+python test_hw_version_poll.py --port /dev/ttyUSB1
+
+# Flood mode — back-to-back requests, no delay
+python test_hw_version_poll.py --port /dev/ttyUSB1 --flood
+
+# Walk LEDs
+python test_hw_onboard_led_walk.py --port /dev/ttyUSB1
+
+# Mux switching test
+python test_hw_switching.py --port /dev/ttyUSB1
+
+# ESC passthrough — read version on motor 0
+python test_hw_esc_passthrough.py --port /dev/ttyUSB1 --motor 0
+
+# ESC passthrough — also read EEPROM settings
+python test_hw_esc_passthrough.py --port /dev/ttyUSB1 --motor 0 --read-settings
+```
+
+**DShot note:** The FPGA DShot output is one-shot (fires only on register write, no auto-repeat). After boot the motor pads are driven LOW in DShot mode but no frames are sent until software writes a throttle register. ESCs will not arm until they receive valid DShot 0-throttle frames.
+
 Tang9K build notes:
 
 - Build via CMake target (`tang9k-build`) — this is the supported compile path.

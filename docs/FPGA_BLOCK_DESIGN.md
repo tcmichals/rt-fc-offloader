@@ -7,8 +7,6 @@ This document defines the FCSP/1 offloader architecture and block responsibiliti
 - **Active control-plane handler:** `fcsp_wishbone_master` in `fcsp_offloader_top.sv`.
 - **Channel 0x05 (ESC_SERIAL):** Full TX/RX path wired through `fcsp_io_engines` → `wb_esc_uart` → `fcsp_stream_packetizer`.
 - **SPI TX egress:** Disabled. All responses exit via USB-UART.
-- `fcsp_serv_bridge` is legacy dead code — no longer instantiated.
-
 > **Complete implementation status and gap tracking:** [DESIGN.md](DESIGN.md) §12
 
 ## Design Goals
@@ -135,5 +133,5 @@ Access via FCSP Channel `0x01` (`WRITE_BLOCK` / `READ_BLOCK`).
 ## Timing and Performance
 - **Clock Frequency**: 54 MHz (Verified).
 - **Control Latency**: Zero-software overhead. Register updates are instantaneous.
-- **Throughput**: Maximum utilization of SPI and 1Mbaud USB links.
+- **Throughput**: Maximum utilization of SPI and 2 Mbaud USB links.
 - **Deterministic**: No OS interrupts or CPU stalls can effect actuator timing.

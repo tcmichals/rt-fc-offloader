@@ -8,7 +8,6 @@ The system is a high-speed FPGA offloader designed to bridge a Flight Controller
 - **Channel 0x05 (ESC_SERIAL):** Full TX/RX path wired through `fcsp_io_engines`.
 - **SPI TX egress:** Disabled (`spi_tx_valid = 1'b0`). All responses exit via USB-UART.
 - Channels 0x02/0x03/0x04 ingress: tied off (intentionally dropped).
-- `fcsp_serv_bridge` is legacy dead code — no longer instantiated.
 
 > **Detailed implementation status and gap tracking:** [DESIGN.md](DESIGN.md) §12
 

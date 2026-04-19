@@ -140,7 +140,7 @@ Runnable AXIS reference in this repo:
 ```python
 await _reset(dut)
 await _drive_usb_bytes(dut, frame)
-observed = await _collect_serv_cmd_payload(dut, expected_len)
+observed = await _collect_wb_cmd_payload(dut, expected_len)
 assert observed == expected_payload
 ```
 

@@ -67,7 +67,8 @@ module fcsp_tangnano9k_top (
     end
 
     logic rst;
-    assign rst = ~i_rst_n;
+    logic pll_lock;
+    assign rst = !pll_lock;
 
     logic usb_rx_valid;
     logic [7:0] usb_rx_byte;
@@ -104,7 +105,7 @@ module fcsp_tangnano9k_top (
     logic [HEARTBEAT_CNT_W-1:0] heartbeat_cnt;
     logic heartbeat_led_on;
     
-    // rPLL for ~54 MHz (27MHz * 2 / 1 = 54 MHz)
+    // rPLL for 54 MHz — VCO=432MHz (27*2*8), CLKOUT=432/8=54MHz
     rPLL #(
         .FCLKIN("27"),
         .IDIV_SEL(0),
@@ -118,7 +119,7 @@ module fcsp_tangnano9k_top (
     ) u_pll (
         .CLKIN(i_clk),
         .CLKFB(1'b0),
-        .RESET(~i_rst_n),
+        .RESET(1'b0),
         .RESET_P(1'b0),
         .FBDSEL(6'b000000),
         .IDSEL(6'b000000),
@@ -127,7 +128,7 @@ module fcsp_tangnano9k_top (
         .DUTYDA(4'b0000),
         .FDLY(4'b0000),
         .CLKOUT(sys_clk),
-        .LOCK(),
+        .LOCK(pll_lock),
         .CLKOUTP(),
         .CLKOUTD(),
         .CLKOUTD3()
@@ -136,7 +137,7 @@ module fcsp_tangnano9k_top (
     // UART shim connects physical USB-UART pins to offloader USB byte seam.
     fcsp_uart_byte_stream #(
         .CLK_HZ(SYS_CLK_HZ),
-        .BAUD(1_000_000)
+        .BAUD(230_400)
     ) u_usb_uart (
         .clk       (sys_clk),
         .rst       (rst),
@@ -281,9 +282,9 @@ module fcsp_tangnano9k_top (
     assign o_led_6 = led_reg_out[4];       // LED6: WB LED[4]
 
     // Debug pins — logic analyzer
-    assign o_debug_0 = i_usb_uart_rx;      // CH0: raw UART RX wire
-    assign o_debug_1 = usb_rx_valid;        // CH1: UART decoded a byte
-    assign o_debug_2 = o_usb_uart_tx;       // CH2: raw UART TX wire
+    assign o_debug_0 = i_usb_uart_rx;                           // CH0: raw UART RX line (for LA decode)
+    assign o_debug_1 = usb_rx_valid;                            // CH1: UART decoded a byte
+    assign o_debug_2 = parser_sync_seen;                        // CH2: parser saw sync
 
     logic _unused_ok;
     always_comb begin
@@ -293,7 +294,8 @@ module fcsp_tangnano9k_top (
                    ^ dbg_tx_tready
                    ^ ctrl_tx_overflow ^ ctrl_tx_frame_seen
                    ^ dbg_tx_overflow ^ dbg_tx_frame_seen
-                   ^ esc_tx_active;
+                   ^ esc_tx_active
+                   ^ i_rst_n;
     end
 endmodule
 

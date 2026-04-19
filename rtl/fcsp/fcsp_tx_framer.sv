@@ -68,6 +68,34 @@ module fcsp_tx_framer #(
     logic [7:0]  crc_data_in;
     logic [15:0] emit_index_plus_one;
 
+    // -----------------------------------------------------------------
+    // Synchronous read port — enables BSRAM inference
+    // -----------------------------------------------------------------
+    logic [PAYLOAD_INDEX_W-1:0] mem_rd_addr;
+    logic [7:0]                 mem_rd_data;
+
+    always_comb begin
+        mem_rd_addr = '0;
+        case (state)
+            S_EMIT_LEN_L:
+                mem_rd_addr = '0;              // prime first payload byte
+            S_EMIT_PAYLD: begin
+                if (m_tvalid && m_tready)
+                    mem_rd_addr = emit_index + 1'b1; // next byte
+                else
+                    mem_rd_addr = emit_index;        // hold
+            end
+            S_CAPTURE:
+                mem_rd_addr = '0;              // prime for next frame
+            default:
+                mem_rd_addr = '0;
+        endcase
+    end
+
+    always_ff @(posedge clk) begin
+        mem_rd_data <= payload_mem[mem_rd_addr];
+    end
+
     fcsp_crc16_core_xmodem u_crc_core (
         .data_in (crc_data_in),
         .crc_in  (crc_reg),
@@ -88,7 +116,7 @@ module fcsp_tx_framer #(
             S_EMIT_SEQ_L: m_tdata = frame_seq[7:0];
             S_EMIT_LEN_H: m_tdata = payload_count[15:8];
             S_EMIT_LEN_L: m_tdata = payload_count[7:0];
-            S_EMIT_PAYLD: m_tdata = payload_mem[emit_index];
+            S_EMIT_PAYLD: m_tdata = mem_rd_data;
             S_EMIT_CRC_H: m_tdata = crc_reg[15:8];
             S_EMIT_CRC_L: m_tdata = crc_reg[7:0];
             default:      m_tdata = 8'h00;
@@ -102,7 +130,7 @@ module fcsp_tx_framer #(
             S_EMIT_SEQ_L: crc_data_in = frame_seq[7:0];
             S_EMIT_LEN_H: crc_data_in = payload_count[15:8];
             S_EMIT_LEN_L: crc_data_in = payload_count[7:0];
-            S_EMIT_PAYLD: crc_data_in = payload_mem[emit_index];
+            S_EMIT_PAYLD: crc_data_in = mem_rd_data;
             default:      crc_data_in = 8'h00;
         endcase
 

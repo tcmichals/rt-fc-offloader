@@ -88,53 +88,33 @@ async def _spi_xfer_byte(dut, tx_byte: int = 0x00) -> int:
 
 @cocotb.test()
 async def test_spi_tx_egress_ping_response(dut):
-    """Send PING via USB, assert SPI CS, clock out response via SPI MISO."""
+    """Send PING via SPI MOSI, assert SPI CS, clock out response via SPI MISO.
+
+    Frames injected via SPI get ingress_tid=1 (SPI origin), so the response
+    is routed back to SPI egress (tdest=1).  We bit-bang the PING frame byte
+    by byte over MOSI, then clock out the response from MISO.
+    """
     cocotb.start_soon(Clock(dut.clk, SIM_CLK_NS, unit="ns").start())
     await _reset(dut)
 
-    # Inject PING via USB path
+    # Build PING frame
     cmd = build_control_payload(0x06)  # OP_PING
     frame = encode_frame(flags=0, channel=0x01, seq=0x70, payload=cmd)
-    await _drive_usb_bytes(dut, frame)
 
-    # Wait for response to reach the TX wire (processing latency)
-    for _ in range(200):
-        await RisingEdge(dut.clk)
-
-    # Assert SPI CS and clock out bytes
-    dut.i_spi_cs_n.value = 0
-    # Allow CDC sync (3 stages) to register CS assertion
-    for _ in range(8):
-        await RisingEdge(dut.clk)
-
-    # Clock enough bytes to capture at least a partial response
-    spi_bytes = []
-    for _ in range(20):
-        b = await _spi_xfer_byte(dut, tx_byte=0x00)
-        spi_bytes.append(b)
-
-    dut.i_spi_cs_n.value = 1
-
-    # The PING response was already consumed by USB TX (dual-egress), so
-    # SPI may or may not have captured it depending on when CS was asserted.
-    # What we CAN verify: SPI egress is no longer tied off — at minimum,
-    # the SPI frontend accepted the TX data without hanging the TX path.
-    # Check that the USB TX also worked (regression: must not break USB).
-    # Re-send another PING and this time assert CS first.
-
+    # Assert SPI CS (active-low) and let CDC settle
     dut.i_spi_cs_n.value = 0
     for _ in range(8):
         await RisingEdge(dut.clk)
 
-    # Inject another PING via USB
-    frame2 = encode_frame(flags=0, channel=0x01, seq=0x71, payload=cmd)
-    await _drive_usb_bytes(dut, frame2)
+    # Inject PING via SPI MOSI (bit-bang each frame byte)
+    for byte in frame:
+        await _spi_xfer_byte(dut, tx_byte=byte)
 
-    # Wait for TX response processing
-    for _ in range(300):
+    # Wait for processing latency (parser → CRC → WB master → framer)
+    for _ in range(500):
         await RisingEdge(dut.clk)
 
-    # Clock out bytes via SPI — should include response data
+    # Clock out enough bytes to capture the response on MISO
     spi_out = []
     for _ in range(30):
         b = await _spi_xfer_byte(dut, tx_byte=0x00)

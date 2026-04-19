@@ -13,7 +13,7 @@
 |--------|------|---------|
 | `fcsp_tangnano9k_top` | `rtl/fcsp/boards/tangnano9k/fcsp_tangnano9k_top.sv` | Tang Nano 9K board wrapper. PLL, USB-UART byte stream, LED controller, heartbeat. |
 | `Gowin_rPLL` | (IP) | 27 MHz → 54 MHz PLL |
-| `fcsp_uart_byte_stream` | `rtl/fcsp/fcsp_uart_byte_stream.sv` | USB-UART TX/RX byte-level interface (1 Mbaud) |
+| `fcsp_uart_byte_stream` | `rtl/fcsp/fcsp_uart_byte_stream.sv` | USB-UART TX/RX byte-level interface (2 Mbaud on 20K, 1 Mbaud on 9K) |
 | `wb_led_controller` | `rtl/fcsp/drivers/wb_led_controller.sv` | 6-LED SET/CLEAR/TOGGLE via WB (lives in board wrapper, NOT inside offloader_top) |
 
 ### 1.2 FCSP Offloader Core
@@ -78,8 +78,6 @@ USB ingress is directly from `fcsp_uart_byte_stream` at board level — no modul
 
 | Module | File | Notes |
 |--------|------|-------|
-| `fcsp_serv_bridge` | `rtl/fcsp/fcsp_serv_bridge.sv` | Replaced by `fcsp_wishbone_master`. Dead code. |
-| `fcsp_serv_stub` | `rtl/fcsp/fcsp_serv_stub.sv` | Replaced. Dead code. |
 | `rtl/fcsp/drivers/*` | Various | Legacy copies of IO peripherals before port to `rtl/io/`. Not used in build. |
 
 ---
@@ -440,8 +438,8 @@ For a typical CTRL READ_BLOCK response (7 payload bytes):
 | Arbiter grant | 1 | CTRL always wins when idle |
 | Framer capture | 7 | 1 cycle per payload byte |
 | Framer emit | 17 | 8 header + 7 payload + 2 CRC |
-| USB UART serialize | ~170 | 17 bytes × 10 bits/byte @ 1 Mbaud |
-| **Total** | ~200 | ~3.7 µs @ 54 MHz sys_clk |
+| USB UART serialize | ~85 | 17 bytes × 10 bits/byte @ 2 Mbaud |
+| **Total** | ~115 | ~2.1 µs @ 54 MHz sys_clk |
 
 ---
 
@@ -1144,7 +1142,7 @@ All core RTL datapaths are implemented and verified. The table below tracks rema
 
 **Current state:** Router outputs exist but `m_tel_tready` and `m_log_tready` are hardwired to `1'b1` — data is accepted and dropped.
 
-**Design intent:** These channels are reserved for future use when a flight controller CPU (SERV or external MCU) generates telemetry or logging data. The ingress (host → FPGA) direction is wired and will route correctly. The egress (FPGA → host) direction would need a TX FIFO and arbiter input per channel.
+**Design intent:** These channels are reserved for future use when an external MCU generates telemetry or logging data. The ingress (host → FPGA) direction is wired and will route correctly. The egress (FPGA → host) direction would need a TX FIFO and arbiter input per channel.
 
 **No implementation planned** for the current milestone. The tie-off is safe — no data loss or hang occurs.
 

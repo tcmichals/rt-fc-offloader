@@ -89,7 +89,7 @@ Teaching / reuse value:
 
 - MSP-specific framers/parsers
 - monolithic top-level SoC glue (`wb_spisystem` style coupling)
-- SERV in byte hot path (SERV stays control-plane only)
+- Soft-CPU in byte hot path (control plane only)
 
 ## FCSP adaptation targets in this repo
 

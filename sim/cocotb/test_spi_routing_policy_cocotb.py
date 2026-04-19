@@ -249,14 +249,16 @@ async def test_egress_esc_return_path_routing(dut):
     # verify SPI sees it.  Then send an ESC frame via USB, wait, and
     # verify SPI does NOT see a CH 0x05 response.
 
-    # Step 1: Send PING via USB, assert CS → SPI should see response
+    # Step 1: Send PING via SPI, keep CS down → SPI should see response
+    #         (SPI ingress → ingress_tid=1 → tdest=1 → SPI egress)
     dut.i_spi_cs_n.value = 0
     for _ in range(8):
         await RisingEdge(dut.clk)
 
     cmd = build_control_payload(0x06)  # OP_PING
     frame = encode_frame(flags=0, channel=0x01, seq=0xA0, payload=cmd)
-    await _drive_usb_bytes(dut, frame)
+    for byte in frame:
+        await _spi_xfer_byte(dut, byte)
 
     for _ in range(300):
         await RisingEdge(dut.clk)
@@ -274,6 +276,7 @@ async def test_egress_esc_return_path_routing(dut):
         await RisingEdge(dut.clk)
 
     # --- Case 2: ESC Frame via SPI ---
+    esc_payload = bytes([0x41, 0x42, 0x43])
     esc_frame_spi = encode_frame(flags=0, channel=0x05, seq=0xB1, payload=esc_payload)
     await _spi_send_frame(dut, esc_frame_spi)
     
@@ -285,26 +288,5 @@ async def test_egress_esc_return_path_routing(dut):
     # But we can verify that ingress_tid correctly latched '1'.
     assert int(dut.esc_active_tdest.value) == 1, "Expected esc_active_tdest to be 1 after SPI ESC frame"
 
-    # Now simulate ESC UART data arriving. This should produce an egress frame with TDEST=1.
-    # In the RTL, esc_pkt_tdest is driven by esc_active_tdest.
-    # We can force the packetizer to fire by driving pc_rx_data (if possible)
-    # or just checking the signals at the arbiter input.
-    
-    dut.pc_rx_data.value = 0xEE
-    dut.pc_rx_valid.value = 1
-    await RisingEdge(dut.clk)
-    dut.pc_rx_valid.value = 0
-    
-    # Wait for packetizer timeout (set to 1000 in Makefile, but we can't easily wait if we don't know the exact time)
-    # In this test, we'll just check that s_esc_tdest at the arbiter is correctly linked.
-    await ReadOnly()
-    assert int(dut.u_esc_pkt.s_tdest.value) == 1, f"Expected ESC packetizer s_tdest = 1, got {int(dut.u_esc_pkt.s_tdest.value)}"
-    
-    # Check egress gating: SPI CS down, should see 0xA5 eventually if we wait for packetizer
-    # However, let's just check the combinational logic for spi_tx_valid.
-    # If we force the framer to have a latched TDEST of 1, spi_tx_valid should be high when tx_wire_tvalid is high.
-    
-    # Summary of verification: 
-    # 1. TID is correctly latched from SPI ingress.
-    # 2. Latched TID is propagated to the ESC packetizer.
-    # 3. Control response from SPI correctly returns to SPI (tested in test_spi_ingress_control_allowed).
+    # esc_pkt_tdest is driven by esc_active_tdest; verify it propagates.
+    assert int(dut.esc_pkt_tdest.value) == 1, f"Expected esc_pkt_tdest = 1, got {int(dut.esc_pkt_tdest.value)}"

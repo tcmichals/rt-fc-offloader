@@ -38,7 +38,7 @@ This disconnects the DShot pulse engine and routes the ESC serial stream (Channe
 
 ### Step 2 — Connect Configurator
 
-Open the ESC configurator and connect to the Tang Nano USB-UART port (typically `/dev/ttyUSB0` or `/dev/ttyACM0`). The USB link operates at 1 Mbaud.
+Open the ESC configurator and connect to the Tang Nano USB-UART port (typically `/dev/ttyUSB0` or `/dev/ttyACM0`). The USB link operates at 2 Mbaud (Tang Nano 20K) or 1 Mbaud (Tang Nano 9K).
 
 ### Step 3 — Configure ESC
 

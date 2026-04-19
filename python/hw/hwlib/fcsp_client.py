@@ -36,7 +36,7 @@ from python_fcsp.fcsp_codec import (  # type: ignore[import-not-found]  # noqa: 
 class FcspControlClient:
     """Minimal FCSP register read/write helper over serial CONTROL channel."""
 
-    def __init__(self, port: str = "auto", baud: int = 1_000_000, timeout: float = 0.5) -> None:
+    def __init__(self, port: str = "auto", baud: int = 2_000_000, timeout: float = 0.5) -> None:
         self.port = port
         self.baud = baud
         self.timeout = timeout
@@ -182,7 +182,15 @@ class FcspControlClient:
         seen = bytearray()
 
         while time.monotonic() < deadline:
-            chunk = self._ser.read(self._ser.in_waiting or 64)
+            waiting = self._ser.in_waiting
+            if waiting:
+                chunk = self._ser.read(waiting)
+            else:
+                # Short blocking read to avoid busy-spin; just enough to catch
+                # the first arriving byte without stalling for the full timeout.
+                self._ser.timeout = 0.005
+                chunk = self._ser.read(1)
+                self._ser.timeout = self.timeout
             if not chunk:
                 continue
 
