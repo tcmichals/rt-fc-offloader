@@ -6,11 +6,15 @@
 - [ ] Verify passthrough enter/exit/scan baseline behavior
 - [ ] Capture baseline reference for FCSP parity checks
 
-## Current focus
+## Tang Nano 9K Hardware Verification (Apr 2026)
 
-- [x] Finalize FCSP CONTROL op implementation skeleton
-- [x] Implement `HELLO` + `GET_CAPS` discovery path
-- [x] Implement `READ_BLOCK` / `WRITE_BLOCK` spaces for dynamic IO
+- [x] Stabilize 115,200 baud serial link (10ms parser timeout fix)
+- [x] Verify `WHO_AM_I` register read on hardware
+- [x] Verify `LED_CONTROL` register write on hardware
+- [ ] Verify `NeoPixel` register control and output
+- [ ] Verify `DShot` engine throttle output and timing
+- [ ] Verify `ESC UART` (Channel 0x05) passthrough and telemetry
+- [ ] Standardize baud rate at 2,000,000 for high-speed hardware polling
 
 ## RTL/firmware tasks
 
