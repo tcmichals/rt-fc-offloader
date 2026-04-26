@@ -246,6 +246,17 @@ def parse_args() -> argparse.Namespace:
                     help="Also read EEPROM settings (48 bytes @ 0x7C00)")
     ap.add_argument("--timeout", type=float, default=3.0,
                     help="4-way response timeout in seconds (default: 3.0)")
+    ap.add_argument(
+        "--count",
+        type=int,
+        default=0,
+        help="Number of iterations before exit (0 = run forever, default: 0)",
+    )
+    ap.add_argument(
+        "--no-ansi",
+        action="store_true",
+        help="Disable ANSI line control",
+    )
     return ap.parse_args()
 
 

@@ -91,7 +91,7 @@ def run_test(port: str, baud: int, led_base: int, width: int, step_ms: int, loop
 
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Walk on-board LEDs via wb_led_controller (separate from NeoPixel)")
-    ap.add_argument("--port", default="/dev/ttyUSB0", help="Serial port (default: /dev/ttyUSB0)")
+    ap.add_argument("--port", default="auto", help="Serial port (default: auto)")
     ap.add_argument("--baud", type=int, default=2_000_000, help="Baud rate (default: 2000000)")
     ap.add_argument(
         "--led-base",
@@ -102,6 +102,17 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--width", type=int, default=4, help="Number of LED bits to walk (default: 4)")
     ap.add_argument("--step-ms", type=int, default=120, help="Step delay in ms (default: 120)")
     ap.add_argument("--loops", type=int, default=4, help="Forward/backward loop count (default: 4)")
+    ap.add_argument(
+        "--count",
+        type=int,
+        default=0,
+        help="Number of iterations before exit (0 = run forever, default: 0)",
+    )
+    ap.add_argument(
+        "--no-ansi",
+        action="store_true",
+        help="Disable ANSI line control",
+    )
     return ap.parse_args()
 
 

@@ -26,20 +26,31 @@ from hwlib import (
 
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="FCSP NeoPixel hardware exerciser")
-    ap.add_argument("port", nargs="?", default="/dev/ttyUSB0", help="Serial port (default: /dev/ttyUSB0)")
+    ap.add_argument("--port", default="auto", help="Serial port (default: auto)")
     ap.add_argument("--baud", type=int, default=2_000_000, help="Baud rate (default: 2000000)")
     ap.add_argument("--num-leds", type=int, default=8, help="NeoPixel count to animate (default: 8)")
     ap.add_argument("--step-delay", type=float, default=0.08, help="Animation step delay in seconds")
     ap.add_argument(
-        "--cycles",
+        "--count",
         type=int,
         default=0,
         help="Number of full scanner cycles to run (0 = run forever, default: 0)",
     )
+    ap.add_argument(
+        "--interval-ms",
+        type=int,
+        default=25,
+        help="Poll interval in ms (default: 25)",
+    )
+    ap.add_argument(
+        "--no-ansi",
+        action="store_true",
+        help="Disable ANSI line control",
+    )
     return ap.parse_args()
 
 
-def run_test(port: str, baud: int, num_leds: int, step_delay: float, cycles: int) -> None:
+def run_test(port: str, baud: int, num_leds: int, step_delay: float, count: int) -> None:
     print(f"Connecting to {port} @ {baud} baud...")
 
     with FcspControlClient(port=port, baud=baud) as fcsp:
@@ -92,7 +103,7 @@ def run_test(port: str, baud: int, num_leds: int, step_delay: float, cycles: int
                     time.sleep(step_delay)
 
                 completed_cycles += 1
-                if cycles > 0 and completed_cycles >= cycles:
+                if count > 0 and completed_cycles >= count:
                     break
 
         except KeyboardInterrupt:
@@ -114,7 +125,7 @@ def main() -> None:
         baud=args.baud,
         num_leds=args.num_leds,
         step_delay=args.step_delay,
-        cycles=args.cycles,
+        count=args.count,
     )
 
 

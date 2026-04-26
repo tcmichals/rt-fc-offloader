@@ -205,7 +205,8 @@ module fcsp_tangnano9k_top (
 
     fcsp_offloader_top #(
         .MAX_PAYLOAD_LEN(256),
-        .CLK_FREQ_HZ(SYS_CLK_HZ)
+        .CLK_FREQ_HZ(SYS_CLK_HZ),
+        .NEO_LED_TYPE(1)  // SK6812 RGBW
     ) u_top (
         .clk(sys_clk),
         .rst(rst),

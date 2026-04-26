@@ -9,7 +9,8 @@
 // - IO engines (DSHOT / PWM decode / NeoPixel / ESC UART / mux)
 module fcsp_offloader_top #(
     parameter int MAX_PAYLOAD_LEN = 512,
-    parameter int CLK_FREQ_HZ    = 54_000_000
+    parameter int CLK_FREQ_HZ    = 54_000_000,
+    parameter int NEO_LED_TYPE   = 0   // 0=WS2812, 1=SK6812
 ) (
     input  wire                    clk,
     input  wire                    rst,
@@ -570,7 +571,8 @@ module fcsp_offloader_top #(
     assign o_dbg_tx_frame_seen = dbg_tx_frame_seen;
 
     fcsp_io_engines #(
-        .CLK_FREQ_HZ (CLK_FREQ_HZ)
+        .CLK_FREQ_HZ (CLK_FREQ_HZ),
+        .NEO_LED_TYPE (NEO_LED_TYPE)
     ) u_io_engines (
         .clk             (clk),
         .rst             (rst),
