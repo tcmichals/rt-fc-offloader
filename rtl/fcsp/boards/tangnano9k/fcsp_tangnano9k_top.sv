@@ -48,7 +48,11 @@ module fcsp_tangnano9k_top (
     // Debug pins
     output wire o_debug_0,
     output wire o_debug_1,
-    output wire o_debug_2
+    output wire o_debug_2,
+    output wire o_debug_3,
+    output wire o_debug_4,
+    output wire o_debug_5,
+    output wire o_debug_6
 );
     parameter int LED_WIDTH = 5;
     parameter int SYS_CLK_HZ = 54_000_000;
@@ -67,8 +71,12 @@ module fcsp_tangnano9k_top (
     end
 
     logic rst;
+    logic wb_ack;
+    logic wb_stb;
+    logic crc_ok;
+    logic crc_drop;
     logic pll_lock;
-    assign rst = !pll_lock;
+    assign rst = !pll_lock || !i_rst_n;
 
     logic usb_rx_valid;
     logic [7:0] usb_rx_byte;
@@ -111,11 +119,8 @@ module fcsp_tangnano9k_top (
         .IDIV_SEL(0),
         .FBDIV_SEL(1),
         .ODIV_SEL(8),
-        .DYN_IDIV_SEL("false"),
-        .DYN_FBDIV_SEL("false"),
-        .DYN_ODIV_SEL("false"),
-        .DYN_SDIV_SEL(2),
-        .DEVICE("GW1NR-9C")
+        .DEVICE("GW1NR-9C"),
+        .CLKFB_SEL("internal")
     ) u_pll (
         .CLKIN(i_clk),
         .CLKFB(1'b0),
@@ -137,7 +142,7 @@ module fcsp_tangnano9k_top (
     // UART shim connects physical USB-UART pins to offloader USB byte seam.
     fcsp_uart_byte_stream #(
         .CLK_HZ(SYS_CLK_HZ),
-        .BAUD(230_400)
+        .BAUD(115_200)
     ) u_usb_uart (
         .clk       (sys_clk),
         .rst       (rst),
@@ -254,7 +259,11 @@ module fcsp_tangnano9k_top (
         .o_ctrl_tx_overflow(ctrl_tx_overflow),
         .o_ctrl_tx_frame_seen(ctrl_tx_frame_seen),
         .o_dbg_tx_overflow(dbg_tx_overflow),
-        .o_dbg_tx_frame_seen(dbg_tx_frame_seen)
+        .o_dbg_tx_frame_seen(dbg_tx_frame_seen),
+        .o_wb_ack(wb_ack),
+        .o_wb_stb(wb_stb),
+        .o_crc_ok(crc_ok),
+        .o_crc_drop(crc_drop)
     );
 
     // Heartbeat counter
@@ -281,10 +290,14 @@ module fcsp_tangnano9k_top (
     assign o_led_5 = led_reg_out[3];       // LED5: WB LED[3]
     assign o_led_6 = led_reg_out[4];       // LED6: WB LED[4]
 
-    // Debug pins — logic analyzer
-    assign o_debug_0 = i_usb_uart_rx;                           // CH0: raw UART RX line (for LA decode)
-    assign o_debug_1 = usb_rx_valid;                            // CH1: UART decoded a byte
-    assign o_debug_2 = parser_sync_seen;                        // CH2: parser saw sync
+    // Debug pins — Final CRC-aware mapping (32, 31, 49, 48, 70, 71, 72)
+    assign o_debug_0 = i_usb_uart_rx;                           // CH0 (32): Raw RX
+    assign o_debug_1 = parser_sync_seen;                        // CH1 (31): Sync
+    assign o_debug_2 = parser_header_valid;                     // CH2 (49): Header OK
+    assign o_debug_3 = parser_frame_done;                       // CH3 (48): Bytes Done
+    assign o_debug_4 = crc_ok;                                  // CH4 (70): CRC Success
+    assign o_debug_5 = crc_drop;                                // CH5 (71): CRC Fail
+    assign o_debug_6 = wb_stb;                                  // CH6 (72): Master Start
 
     logic _unused_ok;
     always_comb begin

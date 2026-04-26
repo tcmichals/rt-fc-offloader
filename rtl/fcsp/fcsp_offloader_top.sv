@@ -76,8 +76,13 @@ module fcsp_offloader_top #(
     output wire                    o_ctrl_tx_overflow,
     output wire                    o_ctrl_tx_frame_seen,
     output wire                    o_dbg_tx_overflow,
-    output wire                    o_dbg_tx_frame_seen
+    output wire                    o_dbg_tx_frame_seen,
+    output wire                    o_wb_ack,
+    output wire                    o_wb_stb,
+    output wire                    o_crc_ok,
+    output wire                    o_crc_drop
 );
+    logic                          wb_mux_ack, wb_mux_stb;
     localparam int STREAM_FIFO_DEPTH = MAX_PAYLOAD_LEN;
     localparam logic [7:0] CH_CONTROL = 8'h01;
 
@@ -178,14 +183,29 @@ module fcsp_offloader_top #(
         end
     end
 
+    // Synchronize async SPI CS for safe edge detection (used for both RX clear and TX routing)
+    logic spi_cs_n_meta, spi_cs_n_sync;
+    always_ff @(posedge clk) begin
+        if (rst) begin
+            spi_cs_n_meta <= 1'b1;
+            spi_cs_n_sync <= 1'b1;
+        end else begin
+            spi_cs_n_meta <= i_spi_cs_n;
+            spi_cs_n_sync <= spi_cs_n_meta;
+        end
+    end
+
     assign spi_ingress_drop = frame_from_spi & (crc_frame_channel != CH_CONTROL && crc_frame_channel != 8'h05);
     assign crc_frame_tready = spi_ingress_drop ? 1'b1 : router_s_tready;
 
     fcsp_parser #(
-        .MAX_PAYLOAD_LEN(MAX_PAYLOAD_LEN)
+        .MAX_PAYLOAD_LEN(MAX_PAYLOAD_LEN),
+        .TIMEOUT_USEC(10000),
+        .CLK_HZ(CLK_FREQ_HZ)
     ) u_parser (
         .clk           (clk),
         .rst_n         (~rst),
+        .clr           (frame_from_spi && spi_cs_n_sync),
         .in_valid      (ingress_valid),
         .in_byte       (ingress_byte),
         .in_ready      (ingress_ready),
@@ -208,6 +228,7 @@ module fcsp_offloader_top #(
 
     // Reuse the existing CRC16/XMODEM block through a small buffered gate so
     // only CRC-clean frames move on to the router.
+    logic        crc_gate_valid, crc_gate_ok, crc_gate_drop;
     fcsp_crc_gate #(
         .MAX_PAYLOAD_LEN(MAX_PAYLOAD_LEN)
     ) u_crc_gate (
@@ -614,18 +635,6 @@ module fcsp_offloader_top #(
     //   SPI CS is asserted (dual-egress).  Non-CONTROL responses (e.g. ESC
     //   UART) are suppressed on SPI so only USB sees them.
 
-    // SPI CS synchronizer for TX routing policy (independent of SPI frontend
-    // internal CDC — this is just for the mux/ready gating logic).
-    logic spi_cs_n_meta, spi_cs_n_sync;
-    always_ff @(posedge clk) begin
-        if (rst) begin
-            spi_cs_n_meta <= 1'b1;
-            spi_cs_n_sync <= 1'b1;
-        end else begin
-            spi_cs_n_meta <= i_spi_cs_n;
-            spi_cs_n_sync <= spi_cs_n_meta;
-        end
-    end
 
     assign o_usb_tx_valid = tx_wire_tvalid;
     assign o_usb_tx_byte  = tx_wire_tdata;
@@ -681,6 +690,10 @@ module fcsp_offloader_top #(
                    ^ wb_dbg_tvalid_unused ^ wb_dbg_tdata_unused[0]
                    ^ wb_dbg_tlast_unused;
     end
+    assign o_wb_ack = wb_mux_ack;
+    assign o_wb_stb = wb_mux_stb;
+    assign o_crc_ok = crc_gate_ok;
+    assign o_crc_drop = crc_gate_drop;
 endmodule
 
 `default_nettype wire
