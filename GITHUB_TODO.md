@@ -11,7 +11,7 @@
 - [x] Stabilize 115,200 baud serial link (10ms parser timeout fix)
 - [x] Verify `WHO_AM_I` register read on hardware
 - [x] Verify `LED_CONTROL` register write on hardware
-- [ ] Verify `NeoPixel` register control and output
+- [x] Verify `NeoPixel` register control and output
 - [ ] Verify `DShot` engine throttle output and timing
 - [ ] Verify `ESC UART` (Channel 0x05) passthrough and telemetry
 - [ ] Standardize baud rate at 2,000,000 for high-speed hardware polling
