@@ -19,6 +19,25 @@ Historical note:
 Newest entries should be added near the top.
 
 ---
+22: 
+23: ## 2026-04-26 — Serial Link Stabilized and Wishbone Debug Fixed
+24: 
+25: - **Stabilized 115,200 Baud Link**:
+26:   - Implemented a **10ms timeout** in `fcsp_parser.sv` to handle "garbage" bytes sent by the host (USB-Serial driver flush/init noise).
+27:   - Fixed parser math to use integer-only scaling (removing `real` types) to satisfy Yosys/OSS synthesis requirements.
+28:   - Successfully verified CRC-clean packets arriving on hardware via logic analyzer.
+29: - **Wishbone Debug Visibility Fix**:
+30:   - Discovered and fixed missing internal signal assignments in `fcsp_offloader_top.sv`. Diagnostic ports `o_wb_stb` and `o_wb_ack` were not previously connected to the internal `int_wb_*` bus.
+31:   - Pivoted Tang Nano 9K debug pin mapping to "Bus Watcher" mode:
+32:     - CH4 (70): `wb_stb` (Master Request)
+33:     - CH5 (71): `wb_ack` (Slave Response)
+34:     - CH6 (72): `crc_ok` (CRC Success Pulse)
+35: - **Link Quality**:
+36:   - Confirmed 100% CRC success rate once host-side noise is flushed.
+37:   - Verified 54 MHz system clock stability (no changes made to PLL architecture).
+38: 
+39: ---
+40: 
 
 ## 2026-04-12 — Tang Nano 20K serial poll verified stable on hardware
 

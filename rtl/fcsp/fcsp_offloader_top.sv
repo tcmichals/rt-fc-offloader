@@ -690,6 +690,8 @@ module fcsp_offloader_top #(
                    ^ wb_dbg_tvalid_unused ^ wb_dbg_tdata_unused[0]
                    ^ wb_dbg_tlast_unused;
     end
+    assign wb_mux_ack = int_wb_ack;
+    assign wb_mux_stb = int_wb_stb;
     assign o_wb_ack = wb_mux_ack;
     assign o_wb_stb = wb_mux_stb;
     assign o_crc_ok = crc_gate_ok;
