@@ -290,14 +290,14 @@ module fcsp_tangnano9k_top (
     assign o_led_5 = led_reg_out[3];       // LED5: WB LED[3]
     assign o_led_6 = led_reg_out[4];       // LED6: WB LED[4]
 
-    // Debug pins — Final CRC-aware mapping (32, 31, 49, 48, 70, 71, 72)
+    // Debug pins — Bus Handshake focus (32, 31, 49, 48, 70, 71, 72)
     assign o_debug_0 = i_usb_uart_rx;                           // CH0 (32): Raw RX
     assign o_debug_1 = parser_sync_seen;                        // CH1 (31): Sync
     assign o_debug_2 = parser_header_valid;                     // CH2 (49): Header OK
     assign o_debug_3 = parser_frame_done;                       // CH3 (48): Bytes Done
-    assign o_debug_4 = crc_ok;                                  // CH4 (70): CRC Success
-    assign o_debug_5 = crc_drop;                                // CH5 (71): CRC Fail
-    assign o_debug_6 = wb_stb;                                  // CH6 (72): Master Start
+    assign o_debug_4 = wb_stb;                                  // CH4 (70): Master Request
+    assign o_debug_5 = wb_ack;                                  // CH5 (71): Slave ACK
+    assign o_debug_6 = crc_ok;                                  // CH6 (72): CRC Valid Pulse
 
     logic _unused_ok;
     always_comb begin
