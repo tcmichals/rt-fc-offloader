@@ -118,16 +118,20 @@ module wb_io_bus #(
     slave_sel_t active_slave;
 
     always_comb begin
-        case (page)
-            PAGE_WHO_AM_I: active_slave = SEL_WHOAMI;
-            PAGE_PWM:      active_slave = SEL_PWM;
-            PAGE_DSHOT:    active_slave = SEL_DSHOT;
-            PAGE_MUX:      active_slave = SEL_MUX;
-            PAGE_NEO:      active_slave = SEL_NEO;
-            PAGE_ESC:      active_slave = SEL_ESC;
-            PAGE_LED:      active_slave = SEL_LED;
-            default:       active_slave = SEL_NONE;
-        endcase
+        if (wbm_adr_i[31:16] == 16'h4000) begin
+            case (page)
+                PAGE_WHO_AM_I: active_slave = SEL_WHOAMI;
+                PAGE_PWM:      active_slave = SEL_PWM;
+                PAGE_DSHOT:    active_slave = SEL_DSHOT;
+                PAGE_MUX:      active_slave = SEL_MUX;
+                PAGE_NEO:      active_slave = SEL_NEO;
+                PAGE_ESC:      active_slave = SEL_ESC;
+                PAGE_LED:      active_slave = SEL_LED;
+                default:       active_slave = SEL_NONE;
+            endcase
+        end else begin
+            active_slave = SEL_NONE;
+        end
     end
 
     // Forward address, data, control to all slaves (active gated by stb)
