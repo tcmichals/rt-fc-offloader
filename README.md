@@ -136,7 +136,7 @@ python test_hw_esc_passthrough.py --port /dev/ttyUSB1 --motor 0
 python test_hw_esc_passthrough.py --port /dev/ttyUSB1 --motor 0 --read-settings
 ```
 
-**DShot note:** The FPGA DShot output is one-shot (fires only on register write, no auto-repeat). After boot the motor pads are driven LOW in DShot mode but no frames are sent until software writes a throttle register. ESCs will not arm until they receive valid DShot 0-throttle frames.
+**DShot note:** The FPGA DShot output is auto-repeating (last throttle value is re-sent every 1ms). This ensures ESCs remain armed and responsive even when the host software is not sending constant updates.
 
 Tang9K build notes:
 
