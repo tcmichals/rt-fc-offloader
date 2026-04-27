@@ -17,6 +17,9 @@ from hwlib import (
     DSHOT_MOTOR_THR,
     WHO_AM_I,
     EXPECTED_WHO_AM_I,
+    MUX_CTRL,
+    MODE_DSHOT,
+    make_mux_word,
 )
 
 # Checking if DSHOT_UPDATE is in registers...
@@ -42,7 +45,11 @@ def main() -> None:
         if who != EXPECTED_WHO_AM_I:
             print(f"[WARN] Unexpected ID (expected 0x{EXPECTED_WHO_AM_I:08X})")
 
-        # DShot address mapping
+        # 1. Switch MUX to DShot mode for this channel
+        print(f"Switching motor {args.motor} MUX to DShot mode...")
+        fcsp.write_u32(MUX_CTRL, make_mux_word(MODE_DSHOT, args.motor))
+
+        # 2. DShot address mapping
         motor_addr = DSHOT_MOTOR_THR[args.motor]
         
         if args.sweep:
