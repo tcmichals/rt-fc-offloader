@@ -20,6 +20,7 @@ from hwlib import (
     MUX_CTRL,
     MODE_DSHOT,
     make_mux_word,
+    DSHOT_CONFIG,
 )
 
 # Checking if DSHOT_UPDATE is in registers...
@@ -31,6 +32,7 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--baud", type=int, default=2_000_000, help="Baud rate (default: 2000000)")
     ap.add_argument("--motor", type=int, default=0, choices=[0, 1, 2, 3], help="Motor index (0-3)")
     ap.add_argument("--throttle", type=int, default=0, help="Throttle value (0-2047, default: 0)")
+    ap.add_argument("--mode", type=int, default=150, choices=[150, 300, 600], help="DShot mode (150/300/600, default: 150)")
     ap.add_argument("--sweep", action="store_true", help="Perform a small throttle sweep")
     return ap.parse_args()
 
@@ -45,7 +47,11 @@ def main() -> None:
         if who != EXPECTED_WHO_AM_I:
             print(f"[WARN] Unexpected ID (expected 0x{EXPECTED_WHO_AM_I:08X})")
 
-        # 1. Switch MUX to DShot mode for this channel
+        # 1. Configure DShot mode (speed)
+        print(f"Configuring DShot mode to {args.mode}...")
+        fcsp.write_u32(DSHOT_CONFIG, args.mode)
+
+        # 2. Switch MUX to DShot mode for this channel
         print(f"Switching motor {args.motor} MUX to DShot mode...")
         fcsp.write_u32(MUX_CTRL, make_mux_word(MODE_DSHOT, args.motor))
 
