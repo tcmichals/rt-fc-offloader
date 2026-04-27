@@ -74,6 +74,26 @@ module wb_dshot_controller #(
             wb_ack_o <= wb_cyc_i & wb_stb_i & ~wb_ack_o;
     end
 
+    // Auto-repeat ticker: trigger a frame every 1ms (54,000 cycles @ 54MHz)
+    localparam int TICK_RELOAD = CLK_FREQ_HZ / 1000;
+    logic [$clog2(TICK_RELOAD):0] ticker;
+    logic tick_strobe;
+
+    always_ff @(posedge clk) begin
+        if (rst) begin
+            ticker <= '0;
+            tick_strobe <= 1'b0;
+        end else begin
+            if (ticker >= TICK_RELOAD[15:0] - 1) begin
+                ticker <= '0;
+                tick_strobe <= 1'b1;
+            end else begin
+                ticker <= ticker + 1'b1;
+                tick_strobe <= 1'b0;
+            end
+        end
+    end
+
     // Write registers
     always_ff @(posedge clk) begin
         if (rst) begin
@@ -87,10 +107,11 @@ module wb_dshot_controller #(
             motor3_strobe <= 1'b0;
             motor4_strobe <= 1'b0;
         end else begin
-            motor1_strobe <= 1'b0;
-            motor2_strobe <= 1'b0;
-            motor3_strobe <= 1'b0;
-            motor4_strobe <= 1'b0;
+            // Strobes fire on EITHER a Wishbone write OR the auto-ticker
+            motor1_strobe <= tick_strobe;
+            motor2_strobe <= tick_strobe;
+            motor3_strobe <= tick_strobe;
+            motor4_strobe <= tick_strobe;
 
             if (config_write)
                 dshot_mode_reg <= wb_dat_i[15:0];
