@@ -65,6 +65,7 @@ module fcsp_wishbone_master (
     st_t st;
 
     logic [7:0]  op;
+    logic        op_is_write;  // Registered flag: 1 = WRITE_BLOCK, 0 = READ_BLOCK
     logic [7:0]  space;
     logic [31:0] addr;
     logic [15:0] len;
@@ -131,6 +132,7 @@ module fcsp_wishbone_master (
         if (rst) begin
             st <= ST_IDLE;
             op <= 8'h00;
+            op_is_write <= 1'b0;
             space <= 8'h00;
             addr <= 32'h00000000;
             len <= 16'd0;
@@ -148,6 +150,7 @@ module fcsp_wishbone_master (
                 ST_IDLE: begin
                     if (s_cmd_tvalid) begin
                         op <= s_cmd_tdata;
+                        op_is_write <= (s_cmd_tdata == OP_WRITE_BLOCK);
                         tid_latched <= s_tid;
                         addr <= 32'h0;
                         len <= 16'd0;
@@ -216,12 +219,12 @@ module fcsp_wishbone_master (
                             wb_adr_o <= addr;
                             wb_byte_offset <= 8'd0;
                             
-                            if (op == OP_WRITE_BLOCK) begin
+                            if (op_is_write) begin
                                 byte_idx <= 2'd0;
                                 wb_dat_o <= 32'h0;
                                 wb_sel_o <= 4'h0;
                                 st <= ST_WB_WRITE_DATA;
-                            end else if (op == OP_READ_BLOCK) begin
+                            end else begin
                                 cmd_was_last <= s_cmd_tlast;
                                 st <= ST_WB_READ_EXEC;
                             end
@@ -256,13 +259,13 @@ module fcsp_wishbone_master (
 
                 ST_WB_WRITE_EXEC: begin
                     if (wb_ack_i) begin
-                            if (wb_byte_offset == len[7:0] || cmd_was_last) begin
+                        if (wb_byte_offset == len[7:0] || cmd_was_last) begin
                             rsp_buf[0] <= RES_OK;
                             rsp_buf[1] <= len[15:8];
                             rsp_buf[2] <= len[7:0];
                             rsp_len <= 16'd3;
                             rsp_idx <= 16'd0;
-                               st <= cmd_was_last ? ST_RSP_SEND : ST_DISCARD_CMD;
+                            st <= cmd_was_last ? ST_RSP_SEND : ST_DISCARD_CMD;
                         end else begin
                             wb_adr_o <= wb_adr_o + 32'd4;
                             wb_dat_o <= 32'h0;
@@ -284,7 +287,7 @@ module fcsp_wishbone_master (
                         rsp_buf[6] <= wb_dat_i[7:0];
                         rsp_len <= 16'd7;
                         rsp_idx <= 16'd0;
-                            st <= cmd_was_last ? ST_RSP_SEND : ST_DISCARD_CMD;
+                        st <= cmd_was_last ? ST_RSP_SEND : ST_DISCARD_CMD;
                     end
                 end
 

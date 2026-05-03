@@ -290,3 +290,36 @@ async def parser_completes_back_to_back_frames(dut) -> None:
     assert done_count == 2, f"expected 2 frame_done pulses, got {done_count}"
     assert int(dut.o_len_error.value) == 0, "len_error should remain low for valid frame"
 
+
+@cocotb.test()
+async def parser_times_out_and_resyncs(dut) -> None:
+    """A partial frame followed by silence triggers timeout reset."""
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await _reset(dut)
+
+    valid_frame = encode_frame(flags=0, channel=0x01, seq=10, payload=b"reset_ok")
+    
+    # Send partial header and then stop
+    partial = bytes([0xA5, 0x01, 0x00, 0x01])
+    await _drive_bytes(dut, partial)
+
+    # Verify we are NOT in IDLE (S_SEARCH_SYNC = 0)
+    assert int(dut.state.value) != 0, "parser should be in a non-idle state after partial header"
+
+    # Wait for more than the 300us timeout. 
+    # 54MHz clock = 18.5ns period. 300us = ~16,216 cycles.
+    # We'll wait 20,000 cycles to be sure.
+    for _ in range(20000):
+        await RisingEdge(dut.clk)
+    
+    # Verify we ARE back in IDLE now
+    assert int(dut.state.value) == 0, f"parser should have timed out and returned to S_SEARCH_SYNC(0), but is in state {int(dut.state.value)}"
+
+    # Send the valid frame and ensure it completes
+    saw_done = False
+    for b in valid_frame:
+        _s_sync, _s_hdr, s_done, _p_len, _body_rem = await _drive_and_sample(dut, b)
+        saw_done |= s_done
+
+    assert saw_done, "parser should have recovered and completed the valid frame after timeout"
+

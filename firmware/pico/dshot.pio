@@ -1,0 +1,23 @@
+; DSHOT600 PIO program for RP2350
+; Adapted from Betaflight dshot.pio
+; 1 bit = 1.667us = 40 PIO cycles at DSHOT600
+; Clock divider must be set so each cycle = 1.667us/40 = ~41.67ns
+; At 150MHz system clock: clkdiv = 150e6 * (1.667e-6 / 40) = 6.25
+
+.program dshot_600
+start:
+    set    pins, 0                [31]      ; drive pin LOW - inter-frame gap
+    nop                           [20]      ; min 2us gap before next frame
+    pull   block                            ; wait for CPU to push a packet
+    out    y, 16                            ; discard top 16 bits (only need 16-bit packet)
+bitloop:
+    out    y, 1                             ; shift next bit into y
+    jmp    !y, outzero                      ; branch on bit value
+    set    pins, 1                [26]      ; '1': HIGH for 27 cycles
+    set    pins, 0                [9]       ;      LOW  for 13 cycles (total 40)
+    jmp    !osre, bitloop                   ; loop until all bits sent
+    jmp    start
+outzero:
+    set    pins, 1                [12]      ; '0': HIGH for 13 cycles
+    set    pins, 0                [22]      ;      LOW  for 27 cycles (total 40)
+    jmp    !osre, bitloop         [1]       ; loop until all bits sent (+ 1 alignment)

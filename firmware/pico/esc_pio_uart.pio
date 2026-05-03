@@ -1,0 +1,20 @@
+.program esc_uart_tx
+.side_set 1 opt
+
+; 8N1 transmit, LSB first, 8 clocks per bit
+pull        side 1 [7]   ; idle high / stop bit
+set x, 7    side 0 [7]   ; start bit low
+bitloop:
+    out pins, 1
+    jmp x-- bitloop [6]
+    nop       side 1 [6] ; stop bit
+
+.program esc_uart_rx
+
+; 8N1 receive, LSB first, 8 clocks per bit
+wait 0 pin 0
+set x, 7 [10]            ; align to middle of first data bit
+bitloop:
+    in pins, 1
+    jmp x-- bitloop [6]
+    push block

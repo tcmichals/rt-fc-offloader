@@ -20,7 +20,9 @@ from __future__ import annotations
 import argparse
 import time
 
-from hwlib import EXPECTED_WHO_AM_I, FcspControlClient, WHO_AM_I, LED_BASE
+from hwlib import EXPECTED_WHO_AM_I, FcspControlClient, WHO_AM_I, LED_BASE, setup_file_logging
+
+setup_file_logging("/tmp/fcsp_debug.log")
 
 LED_OUT_OFF = 0x00
 LED_TOGGLE_OFF = 0x04
@@ -91,8 +93,8 @@ def run_test(port: str, baud: int, led_base: int, width: int, step_ms: int, loop
 
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Walk on-board LEDs via wb_led_controller (separate from NeoPixel)")
-    ap.add_argument("--port", default="auto", help="Serial port (default: auto)")
-    ap.add_argument("--baud", type=int, default=2_000_000, help="Baud rate (default: 2000000)")
+    ap.add_argument("--port", default="/dev/ttyUSB1", help="Serial port (default: /dev/ttyUSB1)")
+    ap.add_argument("--baud", type=int, default=115200, help="Baud rate (default: 115200)")
     ap.add_argument(
         "--led-base",
         default=LED_BASE,

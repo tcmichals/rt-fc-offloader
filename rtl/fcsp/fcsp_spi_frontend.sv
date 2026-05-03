@@ -102,6 +102,9 @@ module fcsp_spi_frontend #(
                 rx_shift <= 8'h00;
                 tx_shift <= 8'h00;
                 o_miso <= 1'b0;
+                rx_valid_pending <= 1'b0;
+                o_rx_valid <= 1'b0;
+                tx_hold_valid <= 1'b0;
             end
 
             // On CS assert, prime MISO with first bit of queued TX byte.

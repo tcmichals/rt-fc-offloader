@@ -26,8 +26,8 @@ from hwlib import (
 
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="FCSP NeoPixel hardware exerciser")
-    ap.add_argument("--port", default="auto", help="Serial port (default: auto)")
-    ap.add_argument("--baud", type=int, default=2_000_000, help="Baud rate (default: 2000000)")
+    ap.add_argument("--port", default="/dev/ttyUSB1", help="Serial port (default: /dev/ttyUSB1)")
+    ap.add_argument("--baud", type=int, default=115200, help="Baud rate (default: 115200)")
     ap.add_argument("--num-leds", type=int, default=8, help="NeoPixel count to animate (default: 8)")
     ap.add_argument("--step-delay", type=float, default=0.08, help="Animation step delay in seconds")
     ap.add_argument(

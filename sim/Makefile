@@ -40,7 +40,7 @@ FCSP_TOP_SOURCES := \
 	$(ROOT_DIR)/rtl/io/wb_neoPx.sv \
 	$(ROOT_DIR)/rtl/io/sendPx_axis_flexible.sv \
 	$(ROOT_DIR)/rtl/io/pwmdecoder_wb.sv \
-	$(ROOT_DIR)/rtl/io/pwmdecoder.sv
+	
 
 WB_EXAMPLE_SOURCES := \
 	$(ROOT_DIR)/rtl/fcsp/examples/wb_status_regs.sv
@@ -74,7 +74,7 @@ WB_NEOPX_SOURCES := \
 	$(ROOT_DIR)/rtl/io/sendPx_axis_flexible.sv
 
 PWMDECODER_SOURCES := \
-	$(ROOT_DIR)/rtl/io/pwmdecoder.sv
+	$(ROOT_DIR)/rtl/io/pwmdecoder_wb.sv
 
 WB_ESC_UART_SOURCES := \
 	$(ROOT_DIR)/rtl/io/wb_esc_uart.sv
@@ -163,7 +163,7 @@ test-wb-neopx-cocotb: check-cocotb
 
 test-pwmdecoder-cocotb: check-cocotb
 	rm -rf sim_build results.xml
-	$(MAKE) -C . sim TOPLEVEL=pwmdecoder COCOTB_TEST_MODULES=test_pwmdecoder_cocotb VERILOG_SOURCES="$(PWMDECODER_SOURCES)" EXTRA_ARGS="$(EXTRA_ARGS) -GCLK_FREQ_HZ=100000000"
+	$(MAKE) -C . sim TOPLEVEL=pwmdecoder_wb COCOTB_TEST_MODULES=test_pwmdecoder_cocotb VERILOG_SOURCES="$(PWMDECODER_SOURCES)" EXTRA_ARGS="$(EXTRA_ARGS) -GCLK_FREQ_HZ=100000000 -GNUM_CHANNELS=1"
 
 test-wb-esc-uart-cocotb: check-cocotb
 	rm -rf sim_build results.xml

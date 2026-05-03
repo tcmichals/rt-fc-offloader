@@ -39,7 +39,6 @@ set(TANG9K_SOURCES
     ${CMAKE_SOURCE_DIR}/rtl/io/wb_neoPx.sv
     ${CMAKE_SOURCE_DIR}/rtl/io/sendPx_axis_flexible.sv
     ${CMAKE_SOURCE_DIR}/rtl/io/pwmdecoder_wb.sv
-    ${CMAKE_SOURCE_DIR}/rtl/io/pwmdecoder.sv
 )
 string(JOIN " " TANG9K_SOURCES_STR ${TANG9K_SOURCES})
 set(TANG9K_YOSYS_SCRIPT "read_verilog -sv ${TANG9K_SOURCES_STR}; synth_gowin -top ${TANG9K_TOP} -json ${TANG9K_OUT_DIR}/hardware.json")
@@ -50,16 +49,8 @@ if(NOT TANG9K_OSS_TOOLS_BIN)
     set(TANG9K_OSS_TOOLS_BIN "${TANG9K_OSS_TOOLS_BIN_DEFAULT}")
 endif()
 
-set(TANG9K_BUILD_TIMEOUT_SEC "900" CACHE STRING "Timeout in seconds for full Tang9K build target (0 disables timeout)")
-find_program(TANG9K_TIMEOUT_EXE timeout)
-set(TANG9K_TIMEOUT_CMD)
-if(TANG9K_BUILD_TIMEOUT_SEC AND NOT TANG9K_BUILD_TIMEOUT_SEC STREQUAL "0")
-    if(TANG9K_TIMEOUT_EXE)
-        set(TANG9K_TIMEOUT_CMD ${TANG9K_TIMEOUT_EXE} --signal=TERM --kill-after=30 "${TANG9K_BUILD_TIMEOUT_SEC}")
-    else()
-        message(WARNING "timeout tool not found; Tang9K build step timeouts are disabled")
-    endif()
-endif()
+set(TANG9K_BUILD_TIMEOUT_SEC "0" CACHE STRING "Timeout in seconds for full Tang9K build target (0 disables timeout)")
+set(TANG9K_TIMEOUT_CMD "")
 
 set(TANG9K_BUILD_ENV_PATH "$ENV{PATH}")
 if(EXISTS "${TANG9K_OSS_TOOLS_BIN}")

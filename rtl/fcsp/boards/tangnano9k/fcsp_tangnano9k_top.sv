@@ -291,22 +291,21 @@ module fcsp_tangnano9k_top (
     assign o_led_5 = led_reg_out[3];       // LED5: WB LED[3]
     assign o_led_6 = led_reg_out[4];       // LED6: WB LED[4]
 
-    // Debug pins — Cut back to 3 active pins to relieve routing congestion
+    // Debug pins — Full pipeline trace (7 active)
     assign o_debug_0 = i_usb_uart_rx;                           // CH0 (32): Raw RX
-    assign o_debug_1 = parser_sync_seen;                        // CH1 (31): Sync
-    assign o_debug_2 = parser_header_valid;                     // CH2 (49): Header OK
-    assign o_debug_3 = 1'b0;                                    // Tied off
-    assign o_debug_4 = 1'b0;                                    // Tied off
-    assign o_debug_5 = 1'b0;                                    // Tied off
-    assign o_debug_6 = 1'b0;                                    // Tied off
+    assign o_debug_1 = parser_frame_done;                       // CH1 (31): Frame fully received
+    assign o_debug_2 = crc_ok;                                  // CH2 (49): CRC passed
+    assign o_debug_3 = crc_drop;                                // CH3: CRC failed/dropped
+    assign o_debug_4 = ctrl_tx_frame_seen;                      // CH4: Response sent to TX
+    assign o_debug_5 = o_usb_uart_tx;                           // CH5: Raw TX output
+    assign o_debug_6 = ctrl_tx_overflow;                        // CH6: TX overflow
 
     logic _unused_ok;
     always_comb begin
         _unused_ok = usb_rx_ready ^ usb_tx_byte[0]
                    ^ parser_len_error ^ parser_header_valid
-                   ^ parser_frame_done ^ parser_sync_seen
+                   ^ parser_sync_seen
                    ^ dbg_tx_tready
-                   ^ ctrl_tx_overflow ^ ctrl_tx_frame_seen
                    ^ dbg_tx_overflow ^ dbg_tx_frame_seen
                    ^ esc_tx_active
                    ^ i_rst_n;

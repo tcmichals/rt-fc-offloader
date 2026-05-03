@@ -234,8 +234,8 @@ class EscPassthrough:
 
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="BLHeli ESC passthrough: read version and settings")
-    ap.add_argument("--port", default="auto", help="Serial port (default: auto)")
-    ap.add_argument("--baud", type=int, default=2_000_000, help="FCSP baud rate (default: 2000000)")
+    ap.add_argument("--port", default="/dev/ttyUSB1", help="Serial port (default: /dev/ttyUSB1)")
+    ap.add_argument("--baud", type=int, default=115200, help="FCSP baud rate (default: 115200)")
     ap.add_argument("--motor", type=int, default=0, choices=[0, 1, 2, 3],
                     help="Motor channel 0-3 (default: 0)")
     ap.add_argument("--esc-baud", type=int, default=19200,
@@ -292,12 +292,12 @@ def main() -> None:
 
             try:
                 # Step 1: Switch mux to serial mode on target channel
-                mux = make_mux_word(mode=MODE_SERIAL, channel=motor)
+                mux = make_mux_word(mode=MODE_SERIAL, channel=motor, auto_passthrough_en=1)
                 print(f"\n[1] Mux → serial CH{motor} (0x{mux:02X})")
                 fcsp.write_u32(MUX_CTRL, mux, settle_s=0.005)
 
                 # Step 2: Assert break
-                mux_break = make_mux_word(mode=MODE_SERIAL, channel=motor, force_low=1)
+                mux_break = make_mux_word(mode=MODE_SERIAL, channel=motor, force_low=1, auto_passthrough_en=1)
                 print(f"[2] Assert break (0x{mux_break:02X}), hold {args.break_ms}ms")
                 fcsp.write_u32(MUX_CTRL, mux_break, settle_s=0.0)
                 time.sleep(args.break_ms / 1000.0)
@@ -389,7 +389,7 @@ def main() -> None:
 
             finally:
                 # Step 6: Always restore DShot
-                mux_dshot = make_mux_word(mode=MODE_DSHOT, channel=0)
+                mux_dshot = make_mux_word(mode=MODE_DSHOT, channel=0, auto_passthrough_en=0)
                 print(f"\n[6] Restore DShot (0x{mux_dshot:02X})")
                 fcsp.write_u32(MUX_CTRL, mux_dshot, settle_s=0.01)
 

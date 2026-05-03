@@ -229,7 +229,6 @@ module fcsp_offloader_top #(
 
     // Reuse the existing CRC16/XMODEM block through a small buffered gate so
     // only CRC-clean frames move on to the router.
-    logic        crc_gate_valid, crc_gate_ok, crc_gate_drop;
     fcsp_crc_gate #(
         .MAX_PAYLOAD_LEN(MAX_PAYLOAD_LEN)
     ) u_crc_gate (

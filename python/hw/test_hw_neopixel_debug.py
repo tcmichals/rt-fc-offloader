@@ -22,8 +22,8 @@ from hwlib import (
 
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Targeted NeoPixel Debug")
-    ap.add_argument("--port", default="auto", help="Serial port (default: auto)")
-    ap.add_argument("--baud", type=int, default=2_000_000, help="Baud rate (default: 2000000)")
+    ap.add_argument("--port", default="/dev/ttyUSB1", help="Serial port (default: /dev/ttyUSB1)")
+    ap.add_argument("--baud", type=int, default=115200, help="Baud rate (default: 115200)")
     ap.add_argument("--index", type=int, default=0, help="LED index (0-7, used if pattern is 'single')")
     ap.add_argument("--color", default="blue", choices=["red", "green", "blue", "white", "off"], help="Color to set")
     ap.add_argument("--brightness", type=int, default=50, help="Brightness (0-255)")

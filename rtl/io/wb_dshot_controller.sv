@@ -16,8 +16,9 @@
 `default_nettype wire
 
 module wb_dshot_controller #(
-    parameter int CLK_FREQ_HZ  = 54_000_000,
-    parameter int DEFAULT_MODE = 150
+    parameter int CLK_FREQ_HZ    = 54_000_000,
+    parameter int DEFAULT_MODE   = 150,
+    parameter int WDT_TIMEOUT_MS = 1000  // zero motors if no write for this many ms
 ) (
     input  wire        clk,
     input  wire        rst,
@@ -94,6 +95,29 @@ module wb_dshot_controller #(
         end
     end
 
+    // Watchdog: counts ms ticks since last motor write; mutes output after WDT_TIMEOUT_MS
+    localparam int WDT_RELOAD = WDT_TIMEOUT_MS;
+    logic [$clog2(WDT_RELOAD+1):0] wdt_cnt;
+    logic wdt_expired;
+    wire  any_motor_write = motor1_write | motor2_write | motor3_write | motor4_write;
+
+    always_ff @(posedge clk) begin
+        if (rst) begin
+            wdt_cnt     <= '0;
+            wdt_expired <= 1'b0;
+        end else begin
+            if (any_motor_write) begin
+                wdt_cnt     <= '0;
+                wdt_expired <= 1'b0;
+            end else if (tick_strobe && !wdt_expired) begin
+                if (wdt_cnt >= WDT_RELOAD - 1)
+                    wdt_expired <= 1'b1;
+                else
+                    wdt_cnt <= wdt_cnt + 1;
+            end
+        end
+    end
+
     // Write registers
     always_ff @(posedge clk) begin
         if (rst) begin
@@ -107,11 +131,11 @@ module wb_dshot_controller #(
             motor3_strobe <= 1'b0;
             motor4_strobe <= 1'b0;
         end else begin
-            // Strobes fire on EITHER a Wishbone write OR the auto-ticker
-            motor1_strobe <= tick_strobe;
-            motor2_strobe <= tick_strobe;
-            motor3_strobe <= tick_strobe;
-            motor4_strobe <= tick_strobe;
+            // Strobes fire on EITHER a Wishbone write OR the auto-ticker (unless watchdog expired)
+            motor1_strobe <= tick_strobe & ~wdt_expired;
+            motor2_strobe <= tick_strobe & ~wdt_expired;
+            motor3_strobe <= tick_strobe & ~wdt_expired;
+            motor4_strobe <= tick_strobe & ~wdt_expired;
 
             if (config_write)
                 dshot_mode_reg <= wb_dat_i[15:0];
@@ -145,7 +169,7 @@ module wb_dshot_controller #(
                 4'h1: wb_dat_o <= {16'h0, motor2_value};
                 4'h2: wb_dat_o <= {16'h0, motor3_value};
                 4'h3: wb_dat_o <= {16'h0, motor4_value};
-                4'h4: wb_dat_o <= {28'h0, motor4_ready, motor3_ready, motor2_ready, motor1_ready};
+                4'h4: wb_dat_o <= {27'h0, wdt_expired, motor4_ready, motor3_ready, motor2_ready, motor1_ready};
                 4'h5: wb_dat_o <= {16'h0, dshot_mode_reg};
                 default: wb_dat_o <= 32'h0;
             endcase

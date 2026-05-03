@@ -33,15 +33,15 @@ from hwlib import (
 
 def expect_mux(fcsp: FcspControlClient, expected_word: int, tag: str) -> None:
     got = fcsp.read_u32(MUX_CTRL)
-    # Only compare documented control bits [4:0]
-    if (got & 0x1F) != (expected_word & 0x1F):
+    # Compare documented control bits [5:0]
+    if (got & 0x3F) != (expected_word & 0x3F):
         raise AssertionError(
-            f"{tag}: readback mismatch: wrote=0x{expected_word & 0x1F:02X}, got=0x{got & 0x1F:02X}"
+            f"{tag}: readback mismatch: wrote=0x{expected_word & 0x3F:02X}, got=0x{got & 0x3F:02X}"
         )
     fields = decode_mux_word(got)
     print(
         f"  [OK] {tag}: mode={fields['mode']} channel={fields['channel']} "
-        f"msp={fields['msp_mode']} force_low={fields['force_low']}"
+        f"msp={fields['msp_mode']} force_low={fields['force_low']} auto={fields['auto_passthrough_en']}"
     )
 
 
@@ -65,23 +65,23 @@ def run_test(port: str, baud: int, break_ms: int) -> None:
 
         print("\n[3] Channel sweep in SERIAL mode (software switching path)")
         for motor in range(4):
-            word = make_mux_word(mode=MODE_SERIAL, channel=motor, msp_mode=0, force_low=0)
+            word = make_mux_word(mode=MODE_SERIAL, channel=motor, msp_mode=0, force_low=0, auto_passthrough_en=0)
             fcsp.write_u32(MUX_CTRL, word)
             expect_mux(fcsp, word, f"serial/ch{motor}")
 
         print("\n[4] Return to DSHOT mode")
-        word_dshot = make_mux_word(mode=MODE_DSHOT, channel=0, msp_mode=0, force_low=0)
+        word_dshot = make_mux_word(mode=MODE_DSHOT, channel=0, msp_mode=0, force_low=0, auto_passthrough_en=0)
         fcsp.write_u32(MUX_CTRL, word_dshot)
         expect_mux(fcsp, word_dshot, "dshot restore")
 
         if break_ms > 0:
             print(f"\n[5] Break pulse test ({break_ms} ms) in SERIAL mode")
-            word_break_on = make_mux_word(mode=MODE_SERIAL, channel=0, msp_mode=0, force_low=1)
+            word_break_on = make_mux_word(mode=MODE_SERIAL, channel=0, msp_mode=0, force_low=1, auto_passthrough_en=0)
             fcsp.write_u32(MUX_CTRL, word_break_on)
             expect_mux(fcsp, word_break_on, "break on")
             time.sleep(break_ms / 1000.0)
 
-            word_break_off = make_mux_word(mode=MODE_SERIAL, channel=0, msp_mode=0, force_low=0)
+            word_break_off = make_mux_word(mode=MODE_SERIAL, channel=0, msp_mode=0, force_low=0, auto_passthrough_en=0)
             fcsp.write_u32(MUX_CTRL, word_break_off)
             expect_mux(fcsp, word_break_off, "break off")
 
@@ -91,15 +91,15 @@ def run_test(port: str, baud: int, break_ms: int) -> None:
         print("\nPASS: switching path validated")
         # Safety: always try to leave system in DSHOT mode
         try:
-            fcsp.write_u32(MUX_CTRL, make_mux_word(mode=MODE_DSHOT, channel=0, msp_mode=0, force_low=0))
+            fcsp.write_u32(MUX_CTRL, make_mux_word(mode=MODE_DSHOT, channel=0, msp_mode=0, force_low=0, auto_passthrough_en=0))
         except Exception:
             pass
 
 
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Validate FCSP switching software path via mux register read/write")
-    ap.add_argument("--port", default="auto", help="Serial port (default: auto)")
-    ap.add_argument("--baud", type=int, default=2_000_000, help="Baud rate (default: 2000000)")
+    ap.add_argument("--port", default="/dev/ttyUSB1", help="Serial port (default: /dev/ttyUSB1)")
+    ap.add_argument("--baud", type=int, default=115200, help="Baud rate (default: 115200)")
     ap.add_argument(
         "--break-ms",
         type=int,

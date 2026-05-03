@@ -257,12 +257,7 @@ module fcsp_io_engines #(
         .wb_stb_i  (pwm_stb),
         .wb_cyc_i  (pwm_cyc),
         .wb_ack_o  (pwm_ack),
-        .i_pwm_0   (i_pwm_0),
-        .i_pwm_1   (i_pwm_1),
-        .i_pwm_2   (i_pwm_2),
-        .i_pwm_3   (i_pwm_3),
-        .i_pwm_4   (i_pwm_4),
-        .i_pwm_5   (i_pwm_5)
+        .i_pwm     ({i_pwm_5, i_pwm_4, i_pwm_3, i_pwm_2, i_pwm_1, i_pwm_0})
     );
 
 endmodule

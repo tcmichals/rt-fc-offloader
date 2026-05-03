@@ -20,8 +20,8 @@ from hwlib import EXPECTED_WHO_AM_I, FcspControlClient, WHO_AM_I
 
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Fast WHO_AM_I poll with one-line live status")
-    ap.add_argument("--port", default="auto", help="Serial port (default: auto)")
-    ap.add_argument("--baud", type=int, default=2_000_000, help="Baud rate (default: 2000000)")
+    ap.add_argument("--port", default="/dev/ttyUSB1", help="Serial port (default: /dev/ttyUSB1)")
+    ap.add_argument("--baud", type=int, default=115200, help="Baud rate (default: 115200)")
     ap.add_argument("--interval-ms", type=int, default=25, help="Poll interval in ms (default: 25)")
     ap.add_argument(
         "--count",

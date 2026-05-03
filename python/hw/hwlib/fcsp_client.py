@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import pathlib
 import struct
 import sys
@@ -10,6 +11,9 @@ from typing import Optional
 
 import serial
 from serial.tools import list_ports
+
+# Module-level logger; callers can configure via logging.basicConfig or add handlers.
+logger = logging.getLogger(__name__)
 
 
 def _ensure_sim_codec_on_path() -> None:
@@ -36,7 +40,7 @@ from python_fcsp.fcsp_codec import (  # type: ignore[import-not-found]  # noqa: 
 class FcspControlClient:
     """Minimal FCSP register read/write helper over serial CONTROL channel."""
 
-    def __init__(self, port: str = "auto", baud: int = 2_000_000, timeout: float = 0.5) -> None:
+    def __init__(self, port: str = "auto", baud: int = 115_200, timeout: float = 0.5) -> None:
         self.port = port
         self.baud = baud
         self.timeout = timeout
@@ -105,8 +109,30 @@ class FcspControlClient:
             self._init_sim_registers()
             self.port = resolved_port
             return
+
         try:
-            self._ser = serial.Serial(resolved_port, baudrate=self.baud, timeout=self.timeout)
+            # Open directly at target baud rate.
+            self._ser = serial.Serial(
+                resolved_port,
+                baudrate=self.baud,
+                timeout=self.timeout,
+                dsrdtr=False,
+                rtscts=False,
+                xonxoff=False,
+            )
+            
+            # Reset Wiggle: Toggle DTR/RTS to reset FPGA.
+            # This triggers the i_rst_n logic we wired in the RTL.
+            self._ser.dtr = False
+            self._ser.rts = False
+            time.sleep(0.1)
+            self._ser.dtr = True
+            self._ser.rts = True
+            time.sleep(0.1)
+            
+            # Clear buffers
+            self._ser.reset_input_buffer()
+            self._ser.reset_output_buffer()
         except Exception as exc:
             candidates = self.list_candidate_ports()
             hint = ", ".join(candidates) if candidates else "<none>"
@@ -114,7 +140,18 @@ class FcspControlClient:
                 f"Could not open serial port '{resolved_port}' @ {self.baud}. "
                 f"Available ports: {hint}"
             ) from exc
+
         self.port = resolved_port
+        # Explicitly clear any stale OS/driver buffers.
+        self._ser.reset_input_buffer()
+        self._ser.reset_output_buffer()
+        # Send a flush sequence to the FPGA.
+        print(f"Initializing hardware link on {self.port}...", end="", flush=True)
+        flush_bytes = b"\x00" * 300
+        logger.debug("TX flush: %d zero bytes", len(flush_bytes))
+        self._ser.write(flush_bytes)
+        self._ser.flush()
+        print(" done.")
         time.sleep(0.1)
 
     def close(self) -> None:
@@ -123,6 +160,10 @@ class FcspControlClient:
             self._sim_regs.clear()
             return
         if self._ser is not None:
+            try:
+                self._ser.flush()
+            except Exception:
+                pass
             self._ser.close()
             self._ser = None
 
@@ -160,7 +201,10 @@ class FcspControlClient:
             raise RuntimeError("FCSP client is not open")
         payload = build_write_block_payload(address=address, data=struct.pack(">I", value))
         frame = encode_frame(flags=0, channel=Channel.CONTROL, seq=self._next_seq(), payload=payload)
+        logger.debug("TX write_u32 addr=0x%08X val=0x%08X frame[%d]=%s",
+                     address, value, len(frame), frame.hex())
         self._ser.write(frame)
+        self._ser.flush()
         time.sleep(settle_s)
 
     def read_u32(self, address: int, wait_s: float = 0.05) -> int:
@@ -173,6 +217,8 @@ class FcspControlClient:
             raise RuntimeError("FCSP client is not open")
         payload = build_read_block_payload(address=address, length=4)
         frame = encode_frame(flags=1, channel=Channel.CONTROL, seq=self._next_seq(), payload=payload)
+        logger.debug("TX read_u32 addr=0x%08X frame[%d]=%s",
+                     address, len(frame), frame.hex())
         self._ser.reset_input_buffer()
         self._ser.write(frame)
 
@@ -197,6 +243,8 @@ class FcspControlClient:
             seen.extend(chunk)
             frames = parser.feed(chunk)
             for frame_rx in frames:
+                logger.debug("RX frame ch=%s payload[%d]=%s",
+                             frame_rx.channel, len(frame_rx.payload), frame_rx.payload.hex())
                 # Temporary hardware bring-up compatibility:
                 # Some bitstreams have been observed to return CONTROL payloads
                 # with channel metadata zeroed on egress. Accept channel 0 in
@@ -204,9 +252,16 @@ class FcspControlClient:
                 if frame_rx.channel not in (Channel.CONTROL, 0):
                     continue
                 if len(frame_rx.payload) < 7:
+                    if len(frame_rx.payload) == 1 and frame_rx.payload[0] == 0x06:
+                        raise RuntimeError("FPGA reported INTERNAL_ERROR (Wishbone Bus Timeout)")
                     raise RuntimeError(
                         f"FCSP payload too short for 32-bit read (len={len(frame_rx.payload)})"
                     )
+                
+                # Check response status code
+                if frame_rx.payload[0] != 0x00:  # RES_OK
+                    raise RuntimeError(f"FPGA returned error code: 0x{frame_rx.payload[0]:02x}")
+
                 return struct.unpack(">I", frame_rx.payload[3:7])[0]
 
         if not seen:
@@ -214,7 +269,26 @@ class FcspControlClient:
 
         sample = bytes(seen[:24]).hex()
         sync_seen = bytes([FCSP_SYNC]) in seen
+        logger.warning("read_u32 timeout addr=0x%08X bytes_seen=%d sample=%s",
+                       address, len(seen), sample)
         raise RuntimeError(
             f"No decodable FCSP CONTROL response for read @ 0x{address:08X}; "
             f"bytes_seen={len(seen)} sync_seen={sync_seen} sample={sample}"
         )
+
+
+def setup_file_logging(path: str = "fcsp_debug.log", level: int = logging.DEBUG) -> None:
+    """Configure the fcsp_client logger to write to a file.
+
+    Call this before opening the client to capture all traffic.
+    Example:
+        from hwlib.fcsp_client import setup_file_logging
+        setup_file_logging("fcsp_debug.log")
+    """
+    handler = logging.FileHandler(path, mode="w")
+    handler.setLevel(level)
+    fmt = logging.Formatter("%(asctime)s.%(msecs)03d %(levelname)s %(message)s",
+                            datefmt="%H:%M:%S")
+    handler.setFormatter(fmt)
+    logger.addHandler(handler)
+    logger.setLevel(level)

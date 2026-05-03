@@ -104,20 +104,33 @@ LED_ALL = 0xF
 
 
 def rgbw(r: int, g: int, b: int, w: int = 0) -> int:
-    """Pack into 32-bit SK6812 RGBW word (MSB-first: R[31:24] G[23:16] B[15:8] W[7:0])."""
-    return (r << 24) | (g << 16) | (b << 8) | w
+    """Pack into 32-bit SK6812 GRBW word (MSB-first: G[31:24] R[23:16] B[15:8] W[7:0])."""
+    return (g << 24) | (r << 16) | (b << 8) | w
 
 
-def make_mux_word(mode: int, channel: int, msp_mode: int = 0, force_low: int = 0) -> int:
-    """Build wb_serial_dshot_mux control word bits [4:0]."""
-    return ((force_low & 0x1) << 4) | ((msp_mode & 0x1) << 3) | ((channel & 0x3) << 1) | (mode & 0x1)
+def make_mux_word(
+    mode: int,
+    channel: int,
+    msp_mode: int = 0,
+    force_low: int = 0,
+    auto_passthrough_en: int = 0,
+) -> int:
+    """Build wb_serial_dshot_mux control word bits [5:0]."""
+    return (
+        ((auto_passthrough_en & 0x1) << 5)
+        | ((force_low & 0x1) << 4)
+        | ((msp_mode & 0x1) << 3)
+        | ((channel & 0x3) << 1)
+        | (mode & 0x1)
+    )
 
 
 def decode_mux_word(word: int) -> dict[str, int]:
-    """Decode wb_serial_dshot_mux control word bits [4:0]."""
+    """Decode wb_serial_dshot_mux control word bits [5:0]."""
     return {
         "mode": word & 0x1,
         "channel": (word >> 1) & 0x3,
         "msp_mode": (word >> 3) & 0x1,
         "force_low": (word >> 4) & 0x1,
+        "auto_passthrough_en": (word >> 5) & 0x1,
     }

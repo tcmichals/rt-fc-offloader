@@ -54,7 +54,6 @@ case "${TANG_BOARD}" in
       "${ROOT_DIR}/rtl/io/wb_neoPx.sv"
       "${ROOT_DIR}/rtl/io/sendPx_axis_flexible.sv"
       "${ROOT_DIR}/rtl/io/pwmdecoder_wb.sv"
-      "${ROOT_DIR}/rtl/io/pwmdecoder.sv"
     )
     OPENFPGALOADER_BOARD="tangnano9k"
     PNR_DEVICE="GW1NR-LV9QN88PC6/I5"
@@ -92,7 +91,6 @@ case "${TANG_BOARD}" in
       "${ROOT_DIR}/rtl/io/wb_neoPx.sv"
       "${ROOT_DIR}/rtl/io/sendPx_axis_flexible.sv"
       "${ROOT_DIR}/rtl/io/pwmdecoder_wb.sv"
-      "${ROOT_DIR}/rtl/io/pwmdecoder.sv"
     )
     OPENFPGALOADER_BOARD="tangnano20k"
     PNR_DEVICE="GW2AR-LV18QN88C8/I7"

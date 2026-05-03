@@ -138,6 +138,33 @@ python test_hw_esc_passthrough.py --port /dev/ttyUSB1 --motor 0 --read-settings
 
 **DShot note:** The FPGA DShot output is auto-repeating (last throttle value is re-sent every 1ms). This ensures ESCs remain armed and responsive even when the host software is not sending constant updates.
 
+### Pico firmware build (`firmware/`)
+
+The RP2040 (Pico) firmware lives under `firmware/`. It requires the Pico SDK and an ARM cross-compiler.
+
+**Prerequisites:**
+- `arm-none-eabi-gcc` (e.g. in `~/.tools/gcc-arm-none-eabi/bin/`)
+- Pico SDK (e.g. in `~/.tools/pico-sdk/`)
+- Environment variable `PICO_SDK_PATH` set (done by `source settings.sh`)
+
+**Build:**
+```bash
+source settings.sh
+mkdir -p build/firmware
+cd build/firmware
+cmake ../../firmware \
+    -DPICO_SDK_PATH=$PICO_SDK_PATH \
+    -DPICO_TOOLCHAIN_PATH=$HOME/.tools/gcc-arm-none-eabi/bin
+make -j$(nproc)
+```
+
+Output: `build/firmware/rt_fc_pico.uf2`
+
+**Flash:** Hold BOOTSEL on the Pico, plug USB, then copy the UF2:
+```bash
+cp build/firmware/rt_fc_pico.uf2 /media/$USER/RPI-RP2/
+```
+
 Tang9K build notes:
 
 - Build via CMake target (`tang9k-build`) — this is the supported compile path.

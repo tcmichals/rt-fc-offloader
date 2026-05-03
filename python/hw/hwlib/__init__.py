@@ -1,6 +1,6 @@
 """Reusable helpers for FCSP hardware validation scripts."""
 
-from .fcsp_client import FcspControlClient
+from .fcsp_client import FcspControlClient, setup_file_logging
 from .registers import (
     EXPECTED_WHO_AM_I,
     WHO_AM_I,

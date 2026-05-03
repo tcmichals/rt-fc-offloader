@@ -9,6 +9,7 @@
 //   bit[2:1] = channel: motor 0–3
 //   bit[3]   = msp_mode: 0=passthrough, 1=MSP FC protocol
 //   bit[4]   = force_low: drive selected pin LOW (break for ESC bootloader)
+//   bit[5]   = auto_passthrough_en: enable MSP sniff auto-override (default=0)
 //
 // Source: /media/tcmichals/projects/Tang9K/HacksterIO/SPIQuadCopter/src/wb_serial_dshot_mux.sv
 
@@ -77,6 +78,7 @@ module wb_serial_dshot_mux #(
 
     logic reg_mux_sel;
     logic reg_force_low;
+    logic reg_auto_passthrough_en;
 
     always_ff @(posedge clk) begin
         if (rst) begin
@@ -84,6 +86,7 @@ module wb_serial_dshot_mux #(
             mux_ch       <= 2'b0;
             msp_mode     <= 1'b0;
             reg_force_low <= 1'b0;
+            reg_auto_passthrough_en <= 1'b0;
             wb_ack_o     <= 1'b0;
             wb_dat_o     <= 32'b0;
         end else begin
@@ -96,8 +99,9 @@ module wb_serial_dshot_mux #(
                     mux_ch        <= wb_dat_i[2:1];
                     msp_mode      <= wb_dat_i[3];
                     reg_force_low <= wb_dat_i[4];
+                    reg_auto_passthrough_en <= wb_dat_i[5];
                 end
-                wb_dat_o <= {27'b0, reg_force_low, msp_mode, mux_ch, reg_mux_sel};
+                wb_dat_o <= {26'b0, reg_auto_passthrough_en, reg_force_low, msp_mode, mux_ch, reg_mux_sel};
             end
         end
     end
@@ -128,7 +132,7 @@ module wb_serial_dshot_mux #(
             logic watchdog_reset;
             watchdog_reset = 1'b0;
 
-            if (pc_rx_valid) begin
+            if (reg_auto_passthrough_en && pc_rx_valid) begin
                 case (sniff_state)
                     S_IDLE:   if (pc_rx_data == 8'h24) sniff_state <= S_DOLLAR;  // '$'
                     S_DOLLAR: sniff_state <= (pc_rx_data == 8'h4D) ? S_M      : S_IDLE; // 'M'
@@ -145,6 +149,10 @@ module wb_serial_dshot_mux #(
                 endcase
 
                 if (auto_passthrough_active) watchdog_reset = 1'b1;
+            end else if (!reg_auto_passthrough_en) begin
+                sniff_state <= S_IDLE;
+                auto_passthrough_active <= 1'b0;
+                watchdog_timer <= 32'd0;
             end
 
             // Watchdog timer
@@ -166,10 +174,10 @@ module wb_serial_dshot_mux #(
     logic [1:0]  effective_mux_ch;
 
 `ifdef SIM_CONTROL
-    assign effective_mux_sel = tb_mux_force_en ? tb_mux_force_sel : (auto_passthrough_active ? 1'b0 : reg_mux_sel);
+    assign effective_mux_sel = tb_mux_force_en ? tb_mux_force_sel : ((reg_auto_passthrough_en && auto_passthrough_active) ? 1'b0 : reg_mux_sel);
     assign effective_mux_ch  = tb_mux_force_en ? tb_mux_force_ch  : mux_ch;
 `else
-    assign effective_mux_sel = auto_passthrough_active ? 1'b0 : reg_mux_sel;
+    assign effective_mux_sel = (reg_auto_passthrough_en && auto_passthrough_active) ? 1'b0 : reg_mux_sel;
     assign effective_mux_ch  = mux_ch;
 `endif
 
@@ -278,7 +286,7 @@ module wb_serial_dshot_mux #(
 
     // Suppress unused-signal lint
     logic _unused;
-    always_comb _unused = &{wb_sel_i, wb_dat_i[31:5], wb_adr_i[31:12], wb_adr_i[1:0]};
+    always_comb _unused = &{wb_sel_i, wb_dat_i[31:6], wb_adr_i[31:12], wb_adr_i[1:0]};
 
 endmodule
 
