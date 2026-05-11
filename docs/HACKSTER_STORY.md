@@ -44,16 +44,40 @@ This chain looks like:
 
 PC (ESC Configurator) --- USB/MSP ---> FC CPU ---> bit-bang UART ---> ESC signal pin ---> ESC bootloader
 
-The weakness: the FC CPU is doing software bit-bang UART while also running its normal scheduler (sensor reads, PID loops, LED updates). Any interrupt or task preemption introduces jitter on the serial timing. During a firmware flash this can cause byte framing errors, bootloader timeouts, or in the worst case a partially-written flash that bricks the ESC.
+The weakness: the FC CPU is doing software bit-bang UART while also running its normal scheduler (sensor reads, PID loops, LED updates). Any interrupt or task preemption introduces jitter on the serial timing. During a firmware flash, this can cause byte framing errors, bootloader timeouts, or in the worst case, a partially-written flash that bricks the ESC.
 
+### Harnessing the RP2040: Multi-Core Strategy
 
-How We Tested the Python ESC Configurator — Pico PIO Bring-Up
+To solve the jitter and blocking issues found in traditional firmware, our Pico implementation leverages the dual-core architecture of the RP2040:
 
-Before the full FPGA offloader datapath was complete, the ESC configurator Python code was validated on a Raspberry Pi Pico (RP2040) using its PIO (Programmable I/O) hardware.
+*   **Core 1: Background Tasks**: This core is dedicated entirely to **PWM Decoding** (RC inputs). By isolating the measurement of incoming pulses to Core 1, we ensure that the high-frequency sampling of receiver signals never interrupts the critical motor-control logic on Core 0.
+*   **Core 0: Real-Time Engine**: This is the "Master" core. It handles the high-priority **SPI Slave** communication with the RPi Zero 2W and manages all **PIO State Machines**.
 
-The Pico bring-up path kept close to MSP-style workflows so the Python GUI and ESC configuration logic could be exercised quickly with minimal moving parts. The goal was not to replace the FPGA — it was to prove the Python side of the stack (4-way BLHeli protocol, settings read/write, firmware flash) against a real ESC before plugging in the more complex FPGA transport.
+By splitting the workload this way, Core 0 has a "clean slate" to manage the PIO FIFOs. Whether it's pushing DSHOT frames or tunneling MSP serial packets, the real-time core is never "distracted" by the background overhead of RC signal processing.
 
-The Pico is small and cheap — about $4. But even PIO has limits: each RP2040 has two PIO blocks with four state machines each. Managing four motor outputs plus four half-duplex serial engines simultaneously, at high DShot rates, pushes against those limits. A small FPGA like the Tang Nano 9K gives you purpose-built RTL for each engine, all running in parallel, with no CPU at all. The trade-off is cost — the Tang Nano 9K is roughly $15-18 — but for a flight controller that needs deterministic timing on every motor output simultaneously, it is the cleaner architecture.
+### Technical Showdown: PIO vs. Bit-Banging
+
+The real innovation in the Pico implementation was moving away from the "software bit-banging" model used by traditional flight controllers like Betaflight.
+
+**The Betaflight Approach:**
+In Betaflight's `serial_4way_avrootloader.c`, the CPU handles the 19200 baud UART protocol using tight `micros()` busy-wait loops. This blocks the CPU and is highly sensitive to interrupt jitter. If the processor misses a bit-transition because it's busy with a high-priority task, the serial frame is corrupted.
+
+**The Pico PIO Approach:**
+On the RP2040, we offload the UART protocol to the PIO state machines. The CPU just drops bytes into a FIFO, and the PIO hardware handles the 8N1 framing (Start/Stop bits) with nanosecond-level precision. This is **non-blocking** and **deterministic**—the bit-timing is immune to whatever the CPU is doing.
+
+```text
+.program esc_uart_tx
+.side_set 1 opt
+pull        side 1 [7]   ; idle high / stop bit
+set x, 7    side 0 [7]   ; start bit low
+bitloop:
+    out pins, 1          ; shift out 1 bit
+    jmp x-- bitloop [6]  ; loop for 8 bits
+    nop       side 1 [6] ; stop bit
+```
+
+**Hardware Half-Duplex:**
+The Pico firmware explicitly manages the half-duplex transition. The PIO state machine is re-initialized the instant a TX frame finishes, ensuring it is ready to capture the ESC's response with zero latency.
 
 The DShot to ESC Serial transition on the Pico:
 
@@ -75,7 +99,11 @@ Step 6 — Exit and restore DShot: On exit the PIO serial engine was stopped and
 
 This was validated against a single ESC and motor. The test script is at python/hw/test_hw_esc_passthrough.py in the repo.
 
-Why move to an FPGA: The Pico PIO approach proved the protocol and the Python stack worked. But it only handled one motor at a time, the PIO instruction memory limited how complex the state machines could get, and any future additions (telemetry, bidirectional DShot, logging) would compete for the same limited PIO resources. The FPGA replaced PIO with RTL that does the same job — but all four motors simultaneously, at higher link speed, with no CPU involvement and no resource contention.
+### Why move to an FPGA?
+
+While the Pico PIO approach proved the protocol and the Python stack worked, we eventually hit a wall. The RP2040 has a hard limit of **32 PIO instructions** shared across all state machines. As we added features like NeoPixel status lights, 4-channel DShot, and ESC telemetry, we ran out of "instruction real estate."
+
+The FPGA replaces PIO with hardwired RTL that does the same job—but for all four motors simultaneously, at higher link speeds, with zero CPU involvement and no resource contention.
 
 
 ## The Problem
@@ -85,6 +113,50 @@ When you want to tune a motor ESC — change timing, demag, or motor direction �
 That works, but it is fragile. The CPU has to drop flight tasks, the timing is subject to scheduler jitter, and if the configurator times out mid-flash you can brick an ESC.
 
 We built something better.
+
+### The FPGA Architecture
+
+The core of the offloader is a specialized RTL (Register Transfer Level) design that moves the entire timing-critical path into hardware gates.
+
+```text
+    [ SPI (Linux) ]   [ Serial (PC) ]
+           |                 |
+           v                 v
+    +------------------------------+
+    |      Host Ingress Mux        |
+    +--------------+---------------+
+                   |
+                   v
+    +------------------------------+
+    |    FCSP Protocol Decoder     |
+    |  (Header Sync, CRC16, Route) |
+    +---+----------------------+---+
+        |                      |
+        v [ Channel Router ]   v
+    +-------------+     +----------+
+    | ESC Serial  |     | WB Master|
+    | (Ch 0x05)   |     | (Ch 0x01)|
+    +-----+-------+     +------+---+
+          |                    |
+          v                    v
+    +-----------+   +---------------------------------+
+    |  1-Wire   |   |          Wishbone Bus           |
+    | UART Core |   +--+-----+-----+-----+-----+------+
+    +-----+-----+      |     |     |     |     |
+          |            v     v     v     v     v
+          |        +-------+ +-------+ +-------+ +-------+
+          |        | DShot | | NeoPX | | LED   | | PWM   |
+          |        | Engine| | Engine| | Ctrl  | | Decode|
+          |        +---+---+ +---+---+ +---+---+ +---+---+
+          |            |         |         |         |
+          v            v         v         v         v
+    +-----------------------------------------------------+
+    |                  Hardware Pin Mux                   |
+    +--------------------------+--------------------------+
+                               |
+                               v
+                       [ Physical Pins ]
+```
 
 ## The Hardware
 
