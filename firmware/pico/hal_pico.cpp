@@ -7,7 +7,6 @@
 #include "dshot.h"
 #include "debug_uart.h"
 #include "spi_slave.h"
-#include "pwm_decode.h"
 #include "msp.h"
 #include "../common/esc_passthrough.h"
 #include "esc_pio_serial.h"
@@ -167,7 +166,7 @@ bool hal_spi_is_busy(void) {
 }
 
 uint16_t hal_pwm_get_us(uint8_t channel) {
-    return pwm_get_us(channel);
+    return 0; // PWM decode removed
 }
 
 void hal_esc_serial_putc(uint8_t channel, uint8_t c) {

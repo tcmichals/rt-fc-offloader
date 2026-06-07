@@ -7,8 +7,6 @@
 #include "hardware/structs/sio.h"
 #include "dshot.h"
 #include "debug_uart.h"
-#include "neopixel.h"
-#include "pwm_decode.h"
 #include "spi_slave.h"
 #include "timing_config.h"
 #include "../hal/hal.h"
@@ -29,8 +27,6 @@ extern "C" {
  */
 extern "C" void core1_main() {
     while (true) {
-        // Continuous decoding of RC inputs from PWM pins
-        pwm_decode_update();
 
         // Optional logic for LED heartbeats or telemetry status updates
         // could be added here to avoid Core 0 latency spikes.
@@ -201,11 +197,9 @@ int main() {
     }
 
     // Initialize all firmware subsystems
-    pwm_decode_init();
     multicore_launch_core1(core1_main);
 
     dshot_init();
-    neopixel_init();
     spi_slave_init();
 
     // Send startup test pulses (0% throttle on all motors for 2 seconds to arm ESCs)

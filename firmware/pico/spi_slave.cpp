@@ -2,8 +2,6 @@
 #include "dshot.h"
 #include "msp.h"
 #include "esc_passthrough.h"
-#include "neopixel.h"
-#include "pwm_decode.h"
 #include "pico/stdlib.h"
 #include "pico/types.h"
 #include "hardware/spi.h"
@@ -99,19 +97,6 @@ uint32_t reg_read(uint32_t address) {
 
     switch (address) {
         case spi::reg::Version:  return 0xDEADBEEF;
-        case spi::reg::PwmCh1:   return pwm_get_us(0);
-        case spi::reg::PwmCh2:   return pwm_get_us(1);
-        case spi::reg::PwmCh3:   return pwm_get_us(2);
-        case spi::reg::PwmCh4:   return pwm_get_us(3);
-        case spi::reg::PwmCh5:   return pwm_get_us(4);
-        case spi::reg::PwmCh6:   return pwm_get_us(5);
-        case spi::reg::Failsafe: {
-            uint32_t mask = 0;
-            for (int i = 0; i < 6; i++) {
-                if (pwm_is_failsafe(i)) mask |= (1u << i);
-            }
-            return mask;
-        }
         case spi::reg::EscStatus: {
             const bool passthrough_active = esc_passthrough_active();
             const bool dshot_forced_off = msp_is_dshot_forced_off();
@@ -187,14 +172,6 @@ void reg_write(uint32_t address, const uint8_t *data, uint16_t len) {
                 esc_passthrough_end();
             }
             break;
-        case spi::reg::LedData: {
-            uint num = len / 4;
-            for (uint i = 0; i < num && i < NEOPIXEL_COUNT; i++) {
-                neopixel_set(i, data[i*4], data[i*4+1], data[i*4+2], data[i*4+3]);
-            }
-            neopixel_show();
-            break;
-        }
         default: break;
     }
 

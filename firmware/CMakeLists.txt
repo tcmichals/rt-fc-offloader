@@ -15,8 +15,6 @@ add_executable(rt_fc_pico
     pico/hal_pico.cpp
     pico/dshot.cpp
     pico/debug_uart.cpp
-    pico/neopixel.cpp
-    pico/pwm_decode.cpp
     pico/spi_slave.cpp
     pico/esc_pio_serial.cpp
 
