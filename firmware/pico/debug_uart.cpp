@@ -14,7 +14,7 @@ namespace {
 
 static constexpr bool Enabled = true;
 static uart_inst_t *const DebugUart = uart1;
-static constexpr uint DebugUartTxPin = 4;
+static constexpr uint DebugUartTxPin = 20;
 static constexpr uint32_t DebugUartBaud = 115200;
 static constexpr uint16_t TxBufferSize = 1024;
 static constexpr uint16_t TxBufferMask = TxBufferSize - 1;

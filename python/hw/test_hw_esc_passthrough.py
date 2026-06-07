@@ -24,6 +24,8 @@ import time
 sys.path.insert(0, ".")
 
 from hwlib import (
+    DSHOT_CONFIG,
+    DSHOT_MOTOR_RAW,
     ESC_BAUD_DIV,
     EXPECTED_WHO_AM_I,
     FcspControlClient,
@@ -291,6 +293,18 @@ def main() -> None:
             esc = EscPassthrough(fcsp, esc_timeout=args.timeout)
 
             try:
+                # Step 0: Send DShot zero-throttle to arm/idle the ESC
+                motor_addr = DSHOT_MOTOR_RAW[motor]
+                mux_dshot = make_mux_word(mode=MODE_DSHOT, channel=motor)
+                fcsp.write_u32(MUX_CTRL, mux_dshot, settle_s=0.005)
+                fcsp.write_u32(DSHOT_CONFIG, 150, settle_s=0.005)
+                zero_frame = 0x0000  # DShot throttle=0, telem=0, crc=0
+                print(f"\n[0] Sending DShot zero frames for 10s to idle ESC...")
+                deadline = time.monotonic() + 10.0
+                while time.monotonic() < deadline:
+                    fcsp.write_u32(motor_addr, zero_frame, settle_s=0.01)
+                print("    ESC idle conditioning done.")
+
                 # Step 1: Switch mux to serial mode on target channel
                 mux = make_mux_word(mode=MODE_SERIAL, channel=motor, auto_passthrough_en=1)
                 print(f"\n[1] Mux → serial CH{motor} (0x{mux:02X})")

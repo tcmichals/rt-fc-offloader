@@ -5,6 +5,7 @@
 ; At 150MHz system clock: clkdiv = 150e6 * (1.667e-6 / 40) = 6.25
 
 .program dshot_600
+    set    pindirs, 1               ; FORCE pin direction to output
 start:
     set    pins, 0                [31]      ; drive pin LOW - inter-frame gap
     nop                           [20]      ; min 2us gap before next frame

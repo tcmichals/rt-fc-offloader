@@ -2,8 +2,11 @@
 #include "msp.h"
 #include "../hal/hal.h"
 #include "timing_config.h"
+#include "esc_passthrough.h"
+#include "esc_4way.h"
 #include <stddef.h>
 #include <stdint.h>
+#include <cstdio>
 
 namespace {
 
@@ -27,6 +30,26 @@ enum class ParseState {
     WaitPayloadV2,
     WaitCrcV2,
 };
+
+static volatile uint32_t msp_led_toggle_time = 0;
+static constexpr uint32_t MSP_LED_BLINK_MS = 50;  // 50ms blink on each command
+
+static void msp_init_led() {
+    hal_led_init();
+    hal_led_off();
+}
+
+static void msp_blink_led() {
+    hal_led_on();
+    msp_led_toggle_time = hal_uptime_ms() + MSP_LED_BLINK_MS;
+}
+
+static void msp_led_task() {
+    if (msp_led_toggle_time > 0 && hal_uptime_ms() >= msp_led_toggle_time) {
+        hal_led_off();
+        msp_led_toggle_time = 0;
+    }
+}
 
 static ParseState parse_state = ParseState::WaitDollar;
 static uint16_t rx_cmd;
@@ -58,27 +81,10 @@ static volatile uint8_t g_debug_level = static_cast<uint8_t>(msp::DebugLevel::Ba
 
 static volatile uint32_t g_crc_error_count = 0;
 static volatile uint32_t g_v2_crc_error_count = 0;
-static volatile uint8_t g_passthrough_motor_idx = 0;
-static volatile bool    g_passthrough_active = false;
 static volatile uint32_t g_passthrough_begin_ok_count = 0;
 static volatile uint32_t g_passthrough_begin_fail_count = 0;
 static volatile uint32_t g_passthrough_auto_exit_count = 0;
 static volatile uint32_t g_unhandled_cmd_count = 0;
-
-static bool esc_passthrough_active() { return g_passthrough_active; }
-static bool esc_passthrough_begin(uint8_t motor) { 
-    g_passthrough_active = true; 
-    g_passthrough_motor_idx = motor; 
-    return true; 
-}
-static void esc_passthrough_end() { g_passthrough_active = false; }
-static uint8_t esc_passthrough_motor() { return g_passthrough_motor_idx; }
-static void esc_passthrough_init() {}
-static bool esc_4way_task() { return false; }
-static void esc_4way_reset() {}
-static uint8_t esc_4way_esc_count() { return 0; }
-static bool esc_passthrough_dshot_forced_off() { return false; }
-static bool esc_passthrough_dshot_allowed() { return !g_passthrough_active; }
 
 static bool debug_basic_enabled() {
     return DebugTraceEnabled && g_debug_level >= static_cast<uint8_t>(msp::DebugLevel::Basic);
@@ -154,10 +160,60 @@ static void debug_log_int(const char *prefix, int val) {
     hal_debug_puts("\r\n");
 }
 
+static void debug_puts_decimal(int val) {
+    if (val < 0) {
+        hal_debug_putc('-');
+        val = -val;
+    }
+    char buf[11];
+    int pos = 0;
+    if (val == 0) {
+        buf[pos++] = '0';
+    } else {
+        int divisor = 1000000000;
+        bool started = false;
+        while (divisor >= 1) {
+            int digit = (val / divisor) % 10;
+            if (digit != 0 || started) {
+                buf[pos++] = '0' + digit;
+                started = true;
+            }
+            divisor /= 10;
+        }
+    }
+    buf[pos] = '\0';
+    hal_debug_puts(buf);
+}
+
 static void debug_logf(const char *fmt, int a, int b = 0) {
     // Stubbed or replaced by specialized debug_log_int to save space.
     // Full snprintf is too large for 16KB SERV RAM.
     debug_log_int(fmt, a);
+}
+
+static const char* msp_cmd_name(uint16_t cmd) {
+    switch (cmd) {
+        case static_cast<uint16_t>(msp::Command::ApiVersion):     return "ApiVersion";
+        case static_cast<uint16_t>(msp::Command::FcVariant):      return "FcVariant";
+        case static_cast<uint16_t>(msp::Command::FcVersion):      return "FcVersion";
+        case static_cast<uint16_t>(msp::Command::BoardInfo):      return "BoardInfo";
+        case static_cast<uint16_t>(msp::Command::BuildInfo):      return "BuildInfo";
+        case static_cast<uint16_t>(msp::Command::FeatureConfig):  return "FeatureConfig";
+        case static_cast<uint16_t>(msp::Command::Ident):          return "Ident";
+        case static_cast<uint16_t>(msp::Command::Name):           return "Name";
+        case static_cast<uint16_t>(msp::Command::Status):         return "Status";
+        case static_cast<uint16_t>(msp::Command::Motor):          return "Motor";
+        case static_cast<uint16_t>(msp::Command::Rc):             return "Rc";
+        case static_cast<uint16_t>(msp::Command::Analog):         return "Analog";
+        case static_cast<uint16_t>(msp::Command::BatteryState):   return "BatteryState";
+        case static_cast<uint16_t>(msp::Command::Uid):            return "Uid";
+        case static_cast<uint16_t>(msp::Command::MotorTelemetry): return "MotorTelemetry";
+        case static_cast<uint16_t>(msp::Command::SetRawRc):       return "SetRawRc";
+        case static_cast<uint16_t>(msp::Command::SetMotor):       return "SetMotor";
+        case static_cast<uint16_t>(msp::Command::SetPassthrough): return "SetPassthrough";
+        case static_cast<uint16_t>(msp::Command::EepromWrite):    return "EepromWrite";
+        default: return "Unknown";
+    }
 }
 
 static bool should_trace_msp_cmd(uint16_t cmd) {
@@ -204,20 +260,24 @@ static bool normalize_motor_index(uint8_t in_value, uint8_t *out_index) {
 void msp_send_reply_v1(uint8_t cmd, const uint8_t *data, uint8_t len) {
     uint8_t crc = 0;
     if (should_trace_msp_cmd(cmd)) {
-        debug_msp_frame("MSP <--", '>', cmd, data, len);
+        hal_debug_puts("MSP <-- ");
+        hal_debug_puts(msp_cmd_name(cmd));
+        hal_debug_puts(" len=");
+        debug_puts_decimal(len);
+        hal_debug_puts("\r\n");
     }
-    hal_debug_putc(static_cast<uint8_t>(msp::Preamble::Start));
-    hal_debug_putc(static_cast<uint8_t>(msp::Preamble::V1));
-    hal_debug_putc(static_cast<uint8_t>(msp::Direction::FromFC));
+    putchar(static_cast<uint8_t>(msp::Preamble::Start));
+    putchar(static_cast<uint8_t>(msp::Preamble::V1));
+    putchar(static_cast<uint8_t>(msp::Direction::FromFC));
     
-    hal_debug_putc(len); crc ^= len;
-    hal_debug_putc(cmd); crc ^= cmd;
+    putchar(len); crc ^= len;
+    putchar(cmd); crc ^= cmd;
     
     for (int i = 0; i < len; i++) {
-        hal_debug_putc(data[i]);
+        putchar(data[i]);
         crc ^= data[i];
     }
-    hal_debug_putc(crc);
+    putchar(crc);
 }
 
 void msp_send_reply_v2(uint16_t cmd, const uint8_t *data, uint16_t len, uint8_t flags) {
@@ -226,39 +286,43 @@ void msp_send_reply_v2(uint16_t cmd, const uint8_t *data, uint16_t len, uint8_t 
     }
 
     if (should_trace_msp_cmd(cmd)) {
-        debug_logf("MSP <-- v2 cmd=%d len=%d\r\n", cmd, len);
+        hal_debug_puts("MSP <-- v2 ");
+        hal_debug_puts(msp_cmd_name(cmd));
+        hal_debug_puts(" len=");
+        debug_puts_decimal(len);
+        hal_debug_puts("\r\n");
     }
 
-    hal_debug_putc(static_cast<uint8_t>(msp::Preamble::Start));
-    hal_debug_putc(static_cast<uint8_t>(msp::Preamble::V2));
-    hal_debug_putc(static_cast<uint8_t>(msp::Direction::FromFC));
+    putchar(static_cast<uint8_t>(msp::Preamble::Start));
+    putchar(static_cast<uint8_t>(msp::Preamble::V2));
+    putchar(static_cast<uint8_t>(msp::Direction::FromFC));
 
     uint8_t crc = 0;
 
-    hal_debug_putc(flags);
+    putchar(flags);
     crc = crc8_dvb_s2_update(crc, flags);
 
     const uint8_t cmd_l = static_cast<uint8_t>(cmd & 0xFFu);
     const uint8_t cmd_h = static_cast<uint8_t>((cmd >> 8) & 0xFFu);
-    hal_debug_putc(cmd_l);
+    putchar(cmd_l);
     crc = crc8_dvb_s2_update(crc, cmd_l);
-    hal_debug_putc(cmd_h);
+    putchar(cmd_h);
     crc = crc8_dvb_s2_update(crc, cmd_h);
 
     const uint8_t len_l = static_cast<uint8_t>(len & 0xFFu);
     const uint8_t len_h = static_cast<uint8_t>((len >> 8) & 0xFFu);
-    hal_debug_putc(len_l);
+    putchar(len_l);
     crc = crc8_dvb_s2_update(crc, len_l);
-    hal_debug_putc(len_h);
+    putchar(len_h);
     crc = crc8_dvb_s2_update(crc, len_h);
 
     for (uint16_t i = 0; i < len; ++i) {
         const uint8_t b = data ? data[i] : 0;
-        hal_debug_putc(b);
+        putchar(b);
         crc = crc8_dvb_s2_update(crc, b);
     }
 
-    hal_debug_putc(crc);
+    putchar(crc);
 }
 
 void msp_send_reply_v2_in_v1(uint16_t cmd, const uint8_t *data, uint16_t len, uint8_t flags) {
@@ -271,51 +335,51 @@ void msp_send_reply_v2_in_v1(uint16_t cmd, const uint8_t *data, uint16_t len, ui
     const uint16_t inner_size = static_cast<uint16_t>(6u + len);
     uint8_t v1_crc = 0;
 
-    hal_debug_putc(static_cast<uint8_t>(msp::Preamble::Start));
-    hal_debug_putc(static_cast<uint8_t>(msp::Preamble::V1));
-    hal_debug_putc(static_cast<uint8_t>(msp::Direction::FromFC));
+    putchar(static_cast<uint8_t>(msp::Preamble::Start));
+    putchar(static_cast<uint8_t>(msp::Preamble::V1));
+    putchar(static_cast<uint8_t>(msp::Direction::FromFC));
 
-    hal_debug_putc(static_cast<uint8_t>(inner_size));
+    putchar(static_cast<uint8_t>(inner_size));
     v1_crc ^= static_cast<uint8_t>(inner_size);
 
-    hal_debug_putc(static_cast<uint8_t>(MspV2InV1Cmd & 0xFFu));
+    putchar(static_cast<uint8_t>(MspV2InV1Cmd & 0xFFu));
     v1_crc ^= static_cast<uint8_t>(MspV2InV1Cmd & 0xFFu);
 
     uint8_t v2_crc = 0;
 
-    hal_debug_putc(flags);
+    putchar(flags);
     v1_crc ^= flags;
     v2_crc = crc8_dvb_s2_update(v2_crc, flags);
 
     const uint8_t cmd_l = static_cast<uint8_t>(cmd & 0xFFu);
     const uint8_t cmd_h = static_cast<uint8_t>((cmd >> 8) & 0xFFu);
-    hal_debug_putc(cmd_l);
+    putchar(cmd_l);
     v1_crc ^= cmd_l;
     v2_crc = crc8_dvb_s2_update(v2_crc, cmd_l);
-    hal_debug_putc(cmd_h);
+    putchar(cmd_h);
     v1_crc ^= cmd_h;
     v2_crc = crc8_dvb_s2_update(v2_crc, cmd_h);
 
     const uint8_t len_l = static_cast<uint8_t>(len & 0xFFu);
     const uint8_t len_h = static_cast<uint8_t>((len >> 8) & 0xFFu);
-    hal_debug_putc(len_l);
+    putchar(len_l);
     v1_crc ^= len_l;
     v2_crc = crc8_dvb_s2_update(v2_crc, len_l);
-    hal_debug_putc(len_h);
+    putchar(len_h);
     v1_crc ^= len_h;
     v2_crc = crc8_dvb_s2_update(v2_crc, len_h);
 
     for (uint16_t i = 0; i < len; ++i) {
         const uint8_t b = data ? data[i] : 0;
-        hal_debug_putc(b);
+        putchar(b);
         v1_crc ^= b;
         v2_crc = crc8_dvb_s2_update(v2_crc, b);
     }
 
-    hal_debug_putc(v2_crc);
+    putchar(v2_crc);
     v1_crc ^= v2_crc;
 
-    hal_debug_putc(v1_crc);
+    putchar(v1_crc);
 }
 
 void msp_send_ack(uint16_t cmd, bool is_v2, uint8_t v2_flags) {
@@ -497,9 +561,11 @@ static void handle_set_passthrough_command(uint16_t cmd_raw,
                                            bool v2_in_v1,
                                            uint8_t *reply) {
     if (debug_basic_enabled() && DebugCommandLog) {
-        debug_logf("MSP SET_PASSTHROUGH len=%d p0=%d\r\n",
-                   len,
-                   (len > 0 && payload) ? payload[0] : -1);
+        hal_debug_puts("MSP SET_PASSTHROUGH len=");
+        debug_puts_decimal(len);
+        hal_debug_puts(" p0=");
+        debug_puts_decimal((len > 0 && payload) ? payload[0] : -1);
+        hal_debug_puts("\r\n");
     }
 
     bool enable_passthrough = false;
@@ -546,12 +612,16 @@ static void handle_set_passthrough_command(uint16_t cmd_raw,
         }
         if (esc_passthrough_begin(motor_idx)) {
             ++g_passthrough_begin_ok_count;
-            debug_logf("ESC --> passthrough begin motor=%d ok=1\r\n", motor_idx);
+            hal_debug_puts("ESC --> passthrough begin motor=");
+            debug_puts_decimal(motor_idx);
+            hal_debug_puts(" ok=1\r\n");
             esc_4way_reset();
             reply[0] = esc_4way_esc_count();
         } else {
             ++g_passthrough_begin_fail_count;
-            debug_logf("ESC --> passthrough begin motor=%d ok=0\r\n", motor_idx);
+            hal_debug_puts("ESC --> passthrough begin motor=");
+            debug_puts_decimal(motor_idx);
+            hal_debug_puts(" ok=0\r\n");
             esc_4way_reset();
             reply[0] = 0;
         }
@@ -565,7 +635,9 @@ static void handle_set_passthrough_command(uint16_t cmd_raw,
     }
 
     if (debug_basic_enabled() && DebugCommandLog) {
-        debug_logf("MSP SET_PASSTHROUGH active=%d\r\n", esc_passthrough_active() ? 1 : 0);
+        hal_debug_puts("MSP SET_PASSTHROUGH active=");
+        debug_puts_decimal(esc_passthrough_active() ? 1 : 0);
+        hal_debug_puts("\r\n");
     }
     msp_send_reply_auto(cmd_raw, reply, 1, is_v2, v2_flags, v2_in_v1);
 }
@@ -594,9 +666,11 @@ static void handle_set_motor_command(uint16_t cmd_raw,
         motor_override_mailbox = msg;
         motor_override_mailbox_valid = true;
         if (debug_basic_enabled() && DebugCommandLog) {
-            debug_logf("MSP SET_MOTOR m0=%d m1=%d\r\n",
-                       static_cast<int>(msg.values[0]),
-                       static_cast<int>(msg.values[1]));
+            hal_debug_puts("MSP SET_MOTOR m0=");
+            debug_puts_decimal(static_cast<int>(msg.values[0]));
+            hal_debug_puts(" m1=");
+            debug_puts_decimal(static_cast<int>(msg.values[1]));
+            hal_debug_puts("\r\n");
         }
     }
 
@@ -613,23 +687,40 @@ void msp_process_command(uint16_t cmd_raw,
     uint16_t rlen = 0;
     auto cmd = static_cast<uint16_t>(cmd_raw);
 
+    // Blink LED on each MSP command
+    msp_blink_led();
+
     if (debug_basic_enabled() && DebugCommandLog) {
         if (is_v2) {
-            debug_logf(v2_in_v1 ? "MSP RX v2/v1 cmd=%d len=%d\r\n" : "MSP RX v2 cmd=%d len=%d\r\n",
-                       cmd_raw,
-                       len);
+            hal_debug_puts(v2_in_v1 ? "MSP RX v2/v1 " : "MSP RX v2 ");
+            hal_debug_puts(msp_cmd_name(cmd_raw));
+            hal_debug_puts(" len=");
+            debug_puts_decimal(len);
+            hal_debug_puts("\r\n");
         } else {
-            debug_logf("MSP RX v1 cmd=%d len=%d\r\n", cmd_raw, len);
+            hal_debug_puts("MSP RX v1 ");
+            hal_debug_puts(msp_cmd_name(cmd_raw));
+            hal_debug_puts(" len=");
+            debug_puts_decimal(len);
+            hal_debug_puts("\r\n");
         }
     }
 
     if (is_v2) {
         if (should_trace_msp_cmd(cmd_raw)) {
-            debug_logf("MSP --> v2 cmd=%d len=%d\r\n", cmd_raw, len);
+            hal_debug_puts("MSP --> v2 ");
+            hal_debug_puts(msp_cmd_name(cmd_raw));
+            hal_debug_puts(" len=");
+            debug_puts_decimal(len);
+            hal_debug_puts("\r\n");
         }
     } else {
         if (should_trace_msp_cmd(cmd_raw)) {
-            debug_msp_frame("MSP -->", '<', static_cast<uint8_t>(cmd_raw & 0xFFu), payload, static_cast<uint8_t>(len & 0xFFu));
+            hal_debug_puts("MSP --> ");
+            hal_debug_puts(msp_cmd_name(cmd_raw));
+            hal_debug_puts(" len=");
+            debug_puts_decimal(len);
+            hal_debug_puts("\r\n");
         }
     }
 
@@ -653,7 +744,11 @@ void msp_process_command(uint16_t cmd_raw,
         default:
             ++g_unhandled_cmd_count;
             if (debug_verbose_enabled() && DebugVerboseFrames) {
-                debug_logf("MSP !! unhandled cmd=%d len=%d\r\n", cmd_raw, len);
+                hal_debug_puts("MSP !! unhandled cmd=");
+                debug_puts_decimal(cmd_raw);
+                hal_debug_puts(" len=");
+                debug_puts_decimal(len);
+                hal_debug_puts("\r\n");
             }
             msp_send_ack(cmd_raw, is_v2, v2_flags);
             break;
@@ -679,6 +774,7 @@ void msp_init() {
     motor_override_mailbox_valid = false;
     esc_passthrough_init();
     esc_4way_reset();
+    msp_init_led();
     if (DebugStartupBanner) {
         const uint8_t id = build_id_byte();
         char line[8];
@@ -698,6 +794,8 @@ PT_THREAD(msp_task(struct pt *pt)) {
     static uint32_t now_us;
     static uint8_t byte;
     static int c;
+
+    msp_led_task();
 
     PT_BEGIN(pt);
     while (1) {
@@ -803,7 +901,13 @@ PT_THREAD(msp_task(struct pt *pt)) {
                 }
             } else {
                 if (debug_verbose_enabled() && DebugVerboseFrames) {
-                    debug_logf("MSP !! crc mismatch cmd=%d rx=0x%02X\r\n", rx_cmd, byte);
+                    hal_debug_puts("MSP !! crc mismatch cmd=");
+                    debug_puts_decimal(rx_cmd);
+                    hal_debug_puts(" rx=0x");
+                    char hbuf[3];
+                    snprintf(hbuf, sizeof(hbuf), "%02X", byte);
+                    hal_debug_puts(hbuf);
+                    hal_debug_puts("\r\n");
                 }
                 ++g_crc_error_count;
             }
@@ -837,7 +941,11 @@ PT_THREAD(msp_task(struct pt *pt)) {
             rx_idx = 0;
             if (rx_size > sizeof(rx_buf)) {
                 if (debug_verbose_enabled() && DebugVerboseFrames) {
-                    debug_logf("MSP !! v2 payload too large cmd=%d len=%d\r\n", rx_cmd, rx_size);
+                    hal_debug_puts("MSP !! v2 payload too large cmd=");
+                    debug_puts_decimal(rx_cmd);
+                    hal_debug_puts(" len=");
+                    debug_puts_decimal(rx_size);
+                    hal_debug_puts("\r\n");
                 }
                 parse_state = ParseState::WaitDollar;
             } else {
@@ -854,7 +962,13 @@ PT_THREAD(msp_task(struct pt *pt)) {
                 msp_process_command(rx_cmd, rx_buf, rx_size, true, rx_v2_flags);
             } else {
                 if (debug_verbose_enabled() && DebugVerboseFrames) {
-                    debug_logf("MSP !! v2 crc mismatch cmd=%d rx=0x%02X\r\n", rx_cmd, byte);
+                    hal_debug_puts("MSP !! v2 crc mismatch cmd=");
+                    debug_puts_decimal(rx_cmd);
+                    hal_debug_puts(" rx=0x");
+                    char hbuf[3];
+                    snprintf(hbuf, sizeof(hbuf), "%02X", byte);
+                    hal_debug_puts(hbuf);
+                    hal_debug_puts("\r\n");
                 }
                 ++g_v2_crc_error_count;
             }
@@ -901,9 +1015,11 @@ bool msp_motor_override_pop_latest(unsigned short *out_values,
     }
 
     if (debug_basic_enabled() && DebugCommandLog) {
-        debug_logf("MSP OVR POP m0=%d m1=%d\r\n",
-                   static_cast<int>(motor_override_mailbox.values[0]),
-                   static_cast<int>(motor_override_mailbox.values[1]));
+        hal_debug_puts("MSP OVR POP m0=");
+        debug_puts_decimal(static_cast<int>(motor_override_mailbox.values[0]));
+        hal_debug_puts(" m1=");
+        debug_puts_decimal(static_cast<int>(motor_override_mailbox.values[1]));
+        hal_debug_puts("\r\n");
     }
 
     motor_override_mailbox_valid = false;

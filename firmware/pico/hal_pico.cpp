@@ -1,13 +1,36 @@
 #include "../hal/hal.h"
 #include "pico/stdlib.h"
+#include "pico/stdio_usb.h"
 #include "hardware/timer.h"
+#include "hardware/gpio.h"
+#include "hardware/uart.h"
 #include "dshot.h"
 #include "debug_uart.h"
 #include "spi_slave.h"
 #include "pwm_decode.h"
 #include "msp.h"
 #include "../common/esc_passthrough.h"
+#include "esc_pio_serial.h"
 #include <stdio.h>
+
+namespace {
+
+static constexpr uint kDebugUartTxPin = 20;
+static constexpr uint32_t kDebugUartBaud = 115200;
+static bool g_debug_uart_hw_inited = false;
+
+static inline void ensure_debug_uart_hw_init() {
+    if (g_debug_uart_hw_inited) {
+        return;
+    }
+    uart_init(uart1, kDebugUartBaud);
+    gpio_set_function(kDebugUartTxPin, GPIO_FUNC_UART);
+    uart_set_hw_flow(uart1, false, false);
+    uart_set_format(uart1, 8, 1, UART_PARITY_NONE);
+    g_debug_uart_hw_inited = true;
+}
+
+}
 
 extern "C" {
 
@@ -46,15 +69,52 @@ void hal_critical_section_exit(void) {
 }
 
 void hal_debug_putc(char c) {
-    putchar(c);
+    ensure_debug_uart_hw_init();
+    uart_putc_raw(uart1, static_cast<uint8_t>(c));
+    if (stdio_usb_connected()) {
+        putchar(c);
+    }
 }
 
 void hal_debug_puts(const char* s) {
-    debug_uart::write(s);
+    if (!s) {
+        return;
+    }
+
+    ensure_debug_uart_hw_init();
+
+    // Keep human-readable debug text on external UART only.
+    // NOTE: MSP protocol bytes share stdio/USB path via hal_debug_putc();
+    // mirroring debug text to USB corrupts configurator framing.
+    const char *tx = s;
+    while (*tx) {
+        uart_putc_raw(uart1, static_cast<uint8_t>(*tx++));
+    }
 }
 
 void hal_debug_hex(uint32_t val) {
-    debug_uart::writef("%08X", val);
+    char buf[9];
+    snprintf(buf, sizeof(buf), "%08X", static_cast<unsigned int>(val));
+    hal_debug_puts(buf);
+}
+
+void hal_led_init(void) {
+#ifdef PICO_DEFAULT_LED_PIN
+    gpio_init(PICO_DEFAULT_LED_PIN);
+    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+#endif
+}
+
+void hal_led_on(void) {
+#ifdef PICO_DEFAULT_LED_PIN
+    gpio_put(PICO_DEFAULT_LED_PIN, 1);
+#endif
+}
+
+void hal_led_off(void) {
+#ifdef PICO_DEFAULT_LED_PIN
+    gpio_put(PICO_DEFAULT_LED_PIN, 0);
+#endif
 }
 
 void hal_dshot_write(uint8_t channel, uint16_t value) {
@@ -71,14 +131,19 @@ bool hal_dshot_is_passthrough_active(uint8_t channel) {
 }
 
 void hal_dshot_set_passthrough(uint8_t channel, bool active) {
-    // On Pico, toggle the passthrough mode for the specified channel
     if (active) {
         // Entering passthrough: disable DSHOT on this line
         dshot_force_stop_all();
-        esc_passthrough_begin(channel);
+        // Hardware pin muxing for UART/bitbanging
+        uint pin = motors_get_pin(channel);
+        esc_pio_serial_start(pin, 19200); // Default BLHeli baud
     } else {
-        // Exiting passthrough: re-enable normal DSHOT mode
-        esc_passthrough_end();
+        // Exiting passthrough: restore pin to DSHOT PIO
+        esc_pio_serial_stop();
+        // Hardware pin muxing restoration
+        uint pin = motors_get_pin(channel);
+        pio_gpio_init(dshot::Inst, pin);
+        // The dshot_update_all() will automatically re-enable the SM when normal operation resumes.
     }
 }
 
@@ -106,11 +171,14 @@ uint16_t hal_pwm_get_us(uint8_t channel) {
 }
 
 void hal_esc_serial_putc(uint8_t channel, uint8_t c) {
-    // Placeholder for 4-way serial write
+    esc_pio_serial_write_byte(c);
 }
 
 int16_t hal_esc_serial_getc(uint8_t channel) {
-    // Placeholder for 4-way serial read
+    uint8_t out_value;
+    if (esc_pio_serial_read_byte(&out_value)) {
+        return out_value;
+    }
     return -1;
 }
 

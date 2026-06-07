@@ -28,6 +28,11 @@ void     hal_debug_putc(char c);
 void     hal_debug_puts(const char* s);
 void     hal_debug_hex(uint32_t val);
 
+/* --- LED Control --- */
+void     hal_led_init(void);
+void     hal_led_on(void);
+void     hal_led_off(void);
+
 /* --- Motor / DShot --- */
 // Sets the output value for a specific DShot channel
 void     hal_dshot_write(uint8_t channel, uint16_t value);
