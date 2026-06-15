@@ -12,6 +12,21 @@ Build with:
 - `cmake --build build/cmake --target tangnano9k-build`
 - `cmake --build build/cmake --target tangnano20k-build`
 
+## Building with Official Gowin Tools (Recommended)
+
+Due to recent integration issues with the OSS suite for Tang Nano boards, using the official Gowin toolchain is now recommended.
+
+1. **Build Scripts**:
+   - `scripts/build_gowin_cli.sh` (Tang Nano 9K)
+   - `scripts/build_gowin_20k_cli.sh` (Tang Nano 20K)
+2. **Wayland/Ubuntu 26.04 Issues**:
+   - Running the Gowin IDE or `gw_sh` on modern Wayland-based systems (like Ubuntu 26.04) can cause immediate crashes due to a missing or broken Qt Wayland plugin in the Gowin distribution.
+   - The CLI build scripts above automatically fix this by forcing `QT_QPA_PLATFORM=minimal` and disabling XCB GL integration, allowing `gw_sh` to run headlessly without crashing.
+3. **Programming**:
+   - `scripts/program_gowin_9k.sh`
+   - `scripts/program_gowin_20k.sh`
+   *(These automatically locate the bitstream at `impl/pnr/project.fs` and use `openFPGALoader` to write it to SRAM).*
+
 For complete download/install instructions (OSS CAD + Arm GCC + RISC-V GCC), see:
 
 - `docs/TOOLCHAIN_SETUP.md`

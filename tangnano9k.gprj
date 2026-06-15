@@ -1,0 +1,37 @@
+<?xml version="1" encoding="UTF-8"?>
+<!DOCTYPE gowin-fpga-project>
+<Project>
+    <Template>FPGA</Template>
+    <Version>5</Version>
+    <Device name="GW1NR-9C" pn="GW1NR-LV9QN88PC6/I5">gw1nr9c-004</Device>
+    <FileList>
+        <File path="rtl/fcsp/boards/tangnano9k/fcsp_tangnano9k_top.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/fcsp/fcsp_offloader_top.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/fcsp/fcsp_spi_frontend.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/fcsp/fcsp_parser.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/fcsp/fcsp_crc16_core_xmodem.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/fcsp/fcsp_crc16.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/fcsp/fcsp_crc_gate.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/fcsp/fcsp_router.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/fcsp/fcsp_rx_fifo.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/fcsp/fcsp_tx_fifo.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/fcsp/fcsp_tx_arbiter.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/fcsp/fcsp_tx_framer.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/fcsp/fcsp_uart_byte_stream.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/fcsp/fcsp_io_engines.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/fcsp/fcsp_wishbone_master.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/fcsp/fcsp_stream_packetizer.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/fcsp/fcsp_debug_generator.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/fcsp/drivers/wb_led_controller.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/io/wb_io_bus.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/io/wb_dshot_controller.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/io/dshot_out.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/io/wb_serial_dshot_mux.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/io/wb_esc_uart.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/io/wb_neoPx.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/io/sendPx_axis_flexible.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/io/pwmdecoder_wb.sv" type="file.verilog" enable="1"/>
+        <File path="rtl/fcsp/boards/tangnano9k/tang9k.cst" type="file.cst" enable="1"/>
+        <File path="rtl/fcsp/boards/tangnano9k/tang9k.sdc" type="file.sdc" enable="1"/>
+    </FileList>
+</Project>

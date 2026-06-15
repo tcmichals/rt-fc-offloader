@@ -8,6 +8,8 @@ Real-time flight-controller offloader repository for FPGA/RTL-centered transport
 	- `docs/TOOLCHAIN_SETUP.md`
 - Tang Nano 9K build/program guide:
 	- `docs/TANG9K_PROGRAMMING.md`
+- Hardware Debugging (GAO logic analyzer):
+	- `docs/GAO_DEBUGGING.md`
 - Environment setup script:
 	- `settings.sh`
 
@@ -42,6 +44,19 @@ Minimal bring-up from repository root:
 - `cmake --build build/cmake --target tangnano9k-program-sram`
   or `cmake --build build/cmake --target tangnano20k-program-sram`
   *(Note: uses `openFPGALoader` to write to volatile SRAM; use `-program-flash` for persistent flash)*
+
+### Official Gowin Toolchain Build (Recommended)
+
+Due to recent integration issues with the OSS suite, using the official Gowin toolchain is highly recommended for building the Tang Nano bitstreams.
+
+- **Build**:
+  - `bash scripts/build_gowin_cli.sh` (for Tang Nano 9K)
+  - `bash scripts/build_gowin_20k_cli.sh` (for Tang Nano 20K)
+- **Program**:
+  - `bash scripts/program_gowin_9k.sh`
+  - `bash scripts/program_gowin_20k.sh`
+
+*(Note: The build scripts automatically apply fixes to bypass Qt Wayland/GLX crashes commonly experienced on newer Linux distributions like Ubuntu 26.04).*
 
 ## Run all simulations
 

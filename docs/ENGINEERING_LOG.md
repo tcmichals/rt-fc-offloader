@@ -20,6 +20,16 @@ Newest entries should be added near the top.
 
 ---
 
+## 2026-06-15 — Transition to Official Gowin Tools for Build
+
+- **Observation**: The open-source `yosys`/`nextpnr` (OSS Suite) build flow for the Tang Nano 9K encountered integration/build issues, rendering it less reliable for the current RTL.
+- **Resolution**: Pivoted to using the official Gowin toolchain (`gw_sh` CLI) for both Tang Nano 9K and Tang Nano 20K.
+- **Tooling Updates**:
+  - Re-wrote `scripts/build_gowin_cli.sh` to robustly detect `GOWIN_HOME` and bypass Wayland/GLX initialization crashes by forcing `QT_QPA_PLATFORM=minimal` and disabling GL integration.
+  - Added new dedicated build scripts for Tang Nano 20K (`scripts/build_gowin_20k.tcl` and `scripts/build_gowin_20k_cli.sh`), explicitly setting the part number to `GW2AR-LV18QN88C8/I7`.
+
+---
+
 ## 2026-04-26 — NeoPixel RGBW (SK6812) Hardware Verified
 
 - **Hardware Target**: Adafruit NeoPixel Stick (8 x 5050 RGBW LEDs, Product ID [2869](https://www.adafruit.com/product/2869)).
