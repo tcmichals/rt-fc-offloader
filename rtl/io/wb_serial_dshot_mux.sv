@@ -121,7 +121,8 @@ module wb_serial_dshot_mux #(
     logic         auto_passthrough_active;
     logic [31:0]  watchdog_timer;
 
-    localparam int WATCHDOG_LIMIT = CLK_FREQ_HZ * 5;
+    // Use 64-bit intermediate to prevent overflow at high clock rates
+    localparam int WATCHDOG_LIMIT = int'(64'(CLK_FREQ_HZ) * 5);
 
     always_ff @(posedge clk) begin
         if (rst) begin
@@ -285,7 +286,7 @@ module wb_serial_dshot_mux #(
     assign serial_rx_o = (effective_mux_sel == 1'b0) ? serial_rx_sync : 1'b1;
 
     // Suppress unused-signal lint
-    logic _unused;
+    (* unused = "true" *) logic _unused;
     always_comb _unused = &{wb_sel_i, wb_dat_i[31:6], wb_adr_i[31:12], wb_adr_i[1:0]};
 
 endmodule

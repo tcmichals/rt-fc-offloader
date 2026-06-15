@@ -6,7 +6,7 @@ The system is a high-speed FPGA offloader designed to bridge a Flight Controller
 
 - **Active control-plane handler:** `fcsp_wishbone_master` in `fcsp_offloader_top.sv`.
 - **Channel 0x05 (ESC_SERIAL):** Full TX/RX path wired through `fcsp_io_engines`.
-- **SPI TX egress:** Disabled (`spi_tx_valid = 1'b0`). All responses exit via USB-UART.
+- **SPI TX egress:** Dual egress: USB always; SPI when CS active + TDEST latch.
 - Channels 0x02/0x03/0x04 ingress: tied off (intentionally dropped).
 
 > **Detailed implementation status and gap tracking:** [DESIGN.md](DESIGN.md) §12
@@ -28,9 +28,9 @@ The offloader functions as a hardware-level switch fabric, separating low-latenc
 ## 2. Integrated Hardware Sniffing (Auto-Passthrough)
 
 A key innovation in the Pure Hardware design is the **Packet Sniffer** integrated into the Serial Mux.
-1.  **Sniffing**: The Mux engine monitors the extracted stream on Channel 0x05.
-2.  **Recognition**: It looks for MSP headers (`$M<`) or 4-way protocol markers.
-3.  **Auto-Trigger**: If an `MSP_SET_PASSTHROUGH` (0xF5) command is detected, the hardware **automatically** flips the physical pin mux from DShot to Serial, eliminating the need for the host to send manual "Set Mux" register writes.
+1.  **Sniffing**: The Mux engine monitors the raw USB-UART RX byte stream (`pc_rx_valid`).
+2.  **Recognition**: It looks for MSP headers (`$M<`) followed by specific command bytes.
+3.  **Auto-Trigger**: If an `MSP_SET_PASSTHROUGH` (0xF5) or related command is detected, the hardware **automatically** flips the physical pin mux from DShot to Serial, eliminating the need for the host to send manual "Set Mux" register writes.
 
 ## 3. Address Map
 

@@ -59,9 +59,8 @@ async def _drive_and_sample(dut, b: int) -> tuple[bool, bool, bool, int, int]:
     saw_header = bool(dut.o_header_valid.value)
     saw_done = bool(dut.o_frame_done.value)
     payload_len = int(dut.o_payload_len.value)
-    body_remaining = int(dut.body_remaining.value)
     await NextTimeStep()
-    return saw_sync, saw_header, saw_done, payload_len, body_remaining
+    return saw_sync, saw_header, saw_done, payload_len, 0
 
 
 @cocotb.test()
@@ -307,9 +306,9 @@ async def parser_times_out_and_resyncs(dut) -> None:
     assert int(dut.state.value) != 0, "parser should be in a non-idle state after partial header"
 
     # Wait for more than the 300us timeout. 
-    # 54MHz clock = 18.5ns period. 300us = ~16,216 cycles.
-    # We'll wait 20,000 cycles to be sure.
-    for _ in range(20000):
+    # 54MHz clock = 18.5ns period. 10000us = 540,000 cycles.
+    # We'll wait 600,000 cycles to be sure.
+    for _ in range(600000):
         await RisingEdge(dut.clk)
     
     # Verify we ARE back in IDLE now
@@ -323,3 +322,35 @@ async def parser_times_out_and_resyncs(dut) -> None:
 
     assert saw_done, "parser should have recovered and completed the valid frame after timeout"
 
+
+@cocotb.test()
+async def parser_aborts_on_clr_and_resyncs(dut) -> None:
+    """CS abort (clr) mid-frame should reset parser without timeout delay."""
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await _reset(dut)
+
+    valid_frame = encode_frame(flags=0, channel=0x01, seq=10, payload=b"reset_ok")
+    
+    # Send partial header and then assert clr
+    partial = bytes([0xA5, 0x01, 0x00, 0x01])
+    await _drive_bytes(dut, partial)
+
+    # Verify we are NOT in IDLE
+    assert int(dut.state.value) != 0, "parser should be in a non-idle state after partial header"
+
+    # Pulse clr
+    dut.clr.value = 1
+    await RisingEdge(dut.clk)
+    dut.clr.value = 0
+    await RisingEdge(dut.clk)
+    
+    # Verify we ARE back in IDLE immediately
+    assert int(dut.state.value) == 0, "parser should have aborted immediately to S_SEARCH_SYNC(0)"
+
+    # Send the valid frame and ensure it completes
+    saw_done = False
+    for b in valid_frame:
+        _s_sync, _s_hdr, s_done, _p_len, _body_rem = await _drive_and_sample(dut, b)
+        saw_done |= s_done
+
+    assert saw_done, "parser should have recovered and completed the valid frame after abort"

@@ -58,7 +58,7 @@ def test_hw_neopixel_runs_in_sim() -> None:
         baud=1_000_000,
         num_leds=4,
         step_delay=0.0,
-        cycles=1,
+        count=1,
     )
 
 
@@ -122,8 +122,9 @@ def test_hw_neopixel_cli_main_runs_in_sim(monkeypatch) -> None:
         "argv",
         [
             "test_hw_neopixel.py",
+            "--port",
             "sim",
-            "--cycles",
+            "--count",
             "1",
             "--num-leds",
             "4",

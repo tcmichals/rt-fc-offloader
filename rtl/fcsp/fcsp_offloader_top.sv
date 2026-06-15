@@ -81,10 +81,11 @@ module fcsp_offloader_top #(
     output wire                    o_wb_ack,
     output wire                    o_wb_stb,
     output wire                    o_crc_ok,
-    output wire                    o_crc_drop
+    output wire                    o_crc_drop,
+    output wire                    o_wb_timeout
 );
     logic                          wb_mux_ack, wb_mux_stb;
-    localparam int STREAM_FIFO_DEPTH = MAX_PAYLOAD_LEN;
+    localparam int STREAM_FIFO_DEPTH = 64; // Shrunk from MAX_PAYLOAD_LEN to fit Tang9K LUTs
     localparam logic [7:0] CH_CONTROL = 8'h01;
 
     // -----------------------------
@@ -114,17 +115,45 @@ module fcsp_offloader_top #(
         .o_busy    ()
     );
 
-    // Current scaffold transport selection policy:
-    // - USB ingress has priority if valid, else SPI ingress.
+    logic       parser_idle;
     logic       sel_usb_rx;
+    logic       transport_locked;
+    logic       active_transport_usb;
+
+    // Lock the transport when a frame starts so it cannot be preempted.
+    always_ff @(posedge clk) begin
+        if (rst) begin
+            transport_locked <= 1'b0;
+            active_transport_usb <= 1'b0;
+        end else begin
+            if (transport_locked) begin
+                if (parser_idle) begin
+                    transport_locked <= 1'b0;
+                end
+            end else if (!parser_idle) begin
+                transport_locked <= 1'b1;
+                active_transport_usb <= sel_usb_rx;
+            end
+        end
+    end
+
     logic [7:0] ingress_byte;
     logic       ingress_valid;
     logic       ingress_ready;
 
     always_comb begin
-        // High-water mark: if USB UART has data, treat it as the active transport.
-        // Once a frame starts, the frame_from_spi logic (below) locks the routing.
-        sel_usb_rx   = i_usb_rx_valid;
+        if (transport_locked) begin
+            sel_usb_rx = active_transport_usb;
+        end else begin
+            // When idle, prefer SPI if CS is asserted (active low).
+            // Otherwise, allow USB to take the stream if valid data is present.
+            if (!spi_cs_n_sync) begin
+                sel_usb_rx = 1'b0; // SPI has priority while CS is low
+            end else begin
+                sel_usb_rx = i_usb_rx_valid;
+            end
+        end
+
         ingress_byte = sel_usb_rx ? i_usb_rx_byte : spi_rx_byte;
         ingress_valid= sel_usb_rx ? i_usb_rx_valid : spi_rx_valid;
 
@@ -214,6 +243,7 @@ module fcsp_offloader_top #(
         .o_header_valid(o_parser_header_valid),
         .o_len_error   (o_parser_len_error),
         .o_frame_done  (o_parser_frame_done),
+        .o_parser_idle (parser_idle),
         .o_payload_len (parser_payload_len),
         .m_frame_tvalid(parser_frame_tvalid),
         .m_frame_tdata (parser_frame_tdata),
@@ -419,7 +449,9 @@ module fcsp_offloader_top #(
     assign ctrl_tx_meta_flags   = 8'h02; // ACK_RESPONSE
     assign ctrl_tx_meta_seq     = ctrl_pending_seq;
 
-    fcsp_wishbone_master u_wb_master (
+    fcsp_wishbone_master #(
+        .WB_TIMEOUT_CYCLES(1000)
+    ) u_wb_master (
         .clk           (clk),
         .rst           (rst),
         .s_cmd_tvalid  (ctrl_rx_tvalid),
@@ -443,7 +475,8 @@ module fcsp_offloader_top #(
         .wb_cyc_o      (int_wb_cyc),
         .wb_stb_o      (int_wb_stb),
         .wb_ack_i      (int_wb_ack),
-        .wb_dat_i      (int_wb_dat_s2m)
+        .wb_dat_i      (int_wb_dat_s2m),
+        .o_wb_timeout  (o_wb_timeout)
     );
 
     fcsp_tx_fifo #(
@@ -650,7 +683,7 @@ module fcsp_offloader_top #(
     assign tx_wire_tready = i_usb_tx_ready && (spi_tx_ready || spi_cs_n_sync || !tx_route_spi);
 
     // Prevent unused warnings for observability-only wires in scaffold phase.
-    logic _unused_ok;
+    (* unused = "true" *) logic _unused_ok;
     always_comb begin
         _unused_ok = ctrl_rx_tready ^ parser_payload_len[0]
                    ^ ctrl_tx_tlast

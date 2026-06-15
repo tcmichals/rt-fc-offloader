@@ -45,7 +45,8 @@ module wb_esc_uart #(
 
     // Default baud rate
     localparam int DEFAULT_BAUD   = 19_200;
-    localparam int DEFAULT_CLKDIV = CLK_FREQ_HZ / DEFAULT_BAUD;
+    // Use 64-bit intermediate to prevent overflow at high clock rates
+    localparam int DEFAULT_CLKDIV = int'(64'(CLK_FREQ_HZ) / 64'(DEFAULT_BAUD));
 
     // Programmable divider register
     logic [15:0] baud_div;
@@ -170,7 +171,8 @@ module wb_esc_uart #(
         RX_IDLE,
         RX_START,
         RX_DATA,
-        RX_STOP
+        RX_STOP,
+        RX_WAIT_STREAM
     } rx_state_t;
 
     rx_state_t   rx_state;
@@ -216,7 +218,7 @@ module wb_esc_uart #(
             end else begin
                 case (rx_state)
                     RX_IDLE: begin
-                        if (rx_sync == 1'b0) begin
+                        if (rx_sync == 1'b0 && (!m_esc_tvalid || m_esc_tready)) begin
                             rx_state   <= RX_START;
                             rx_counter <= half_bit - 16'd1;
                         end
@@ -259,9 +261,21 @@ module wb_esc_uart #(
                                 m_esc_tdata  <= rx_shift;
                                 m_esc_tvalid <= 1'b1;
                             end
-                            rx_state <= RX_IDLE;
+                            // Wait for downstream to accept before listening for next start bit
+                            // Note: if m_esc_tvalid is newly set to 1, or was already 1, we wait if !tready
+                            if ((rx_sync == 1'b1 || m_esc_tvalid) && !m_esc_tready) begin
+                                rx_state <= RX_WAIT_STREAM;
+                            end else begin
+                                rx_state <= RX_IDLE;
+                            end
                         end else begin
                             rx_counter <= rx_counter - 16'd1;
+                        end
+                    end
+
+                    RX_WAIT_STREAM: begin
+                        if (m_esc_tready) begin
+                            rx_state <= RX_IDLE;
                         end
                     end
 
@@ -333,7 +347,7 @@ module wb_esc_uart #(
     end
 
     // Suppress unused-signal lint
-    logic _unused;
+    (* unused = "true" *) logic _unused;
     always_comb _unused = &{wb_adr_i[1:0], wb_dat_i[31:16]};
 
 endmodule

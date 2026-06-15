@@ -556,7 +556,7 @@ Each SCLK half-period must span at least 4 sys_clk cycles:
 Max SCLK = sys_clk / 8 = 54 MHz / 8 = 6.75 MHz
 ```
 
-**Practical recommendation:** Run the Pico SPI master at 10 MHz or below.
+**Practical recommendation:** Run the SPI master (PC/RPi) at 10 MHz or below.
 This stays within `fcsp_spi_frontend` limits with margin.
 
 ### Full-duplex byte flow
@@ -581,7 +581,7 @@ framing independently.
 ### Classroom exercise
 
 1. Wire a logic analyzer to SCLK, CS_N, MOSI, MISO
-2. Send a known FCSP frame from the Pico
+2. Send a known FCSP frame from the PC/RPi SPI master
 3. Observe: CS_N drops, SCLK toggles, MOSI carries frame bytes MSB-first
 4. On MISO: see `0x00` pad bytes (no response queued yet)
 5. Send a READ_BLOCK command → observe response bytes appearing on MISO

@@ -20,8 +20,8 @@
 | 14  | o_led_4        | Output    | On-board LED 4 (status/debug)         |
 | 15  | o_led_5        | Output    | On-board LED 5 (status/debug)         |
 | 16  | o_led_6        | Output    | On-board LED 6 (status/debug)         |
-| 19  | i_usb_uart_rx  | Input     | USB-UART RX (Configurator Link)       |
-| 20  | o_usb_uart_tx  | Output    | USB-UART TX (Configurator Link)       |
+| 18  | i_usb_uart_rx  | Input     | USB-UART RX (Configurator Link)       |
+| 17  | o_usb_uart_tx  | Output    | USB-UART TX (Configurator Link)       |
 | 51  | pad_motor[0]   | Bidirectional | Motor 1 / ESC Passthrough (IOBUF, tristate) |
 | 42  | pad_motor[1]   | Bidirectional | Motor 2 / ESC Passthrough (IOBUF, tristate) |
 | 41  | pad_motor[2]   | Bidirectional | Motor 3 / ESC Passthrough (IOBUF, tristate) |
@@ -79,8 +79,8 @@ The Tang Nano 9k provides a bidirectional hardware bridge for ESC configuration.
      ┌──────────────────────────────────────────────┐
      │           Tang Nano 9K FPGA Board           │
      │                                              │
-     │  Pin 19 (i_usb_uart_rx) ◄── TX               │
-     │  Pin 20 (o_usb_uart_tx) ──► RX               │
+     │  Pin 18 (i_usb_uart_rx) ◄── TX               │
+     │  Pin 17 (o_usb_uart_tx) ──► RX               │
      │  GND ◄────────────────────── GND             │
      │                                              │
      │  Motor Pins (51, 42, 41, 35) ◄──► ESC Signal │

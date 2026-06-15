@@ -118,7 +118,7 @@ module fcsp_router (
 
     // Consume metadata in skeleton revision so interface is stable even before
     // per-output metadata FIFOs are introduced.
-    logic _unused_meta;
+    (* unused = "true" *) logic _unused_meta;
     always_comb begin
         _unused_meta = ^s_frame_flags ^ ^s_frame_seq ^ ^s_frame_payload_len;
     end

@@ -4,7 +4,8 @@
 #include "debug_uart.h"
 #include "esc_passthrough.h"
 #include "pico/stdlib.h"
-
+#include "../hal/hal.h"
+#include <cstdio>
 #include <cstring>
 
 namespace {
@@ -144,6 +145,91 @@ static uint16_t crc_blheli_update(uint16_t crc, uint8_t value) {
         }
     }
     return crc;
+}
+
+static void log_4way_rx(uint8_t cmd, uint8_t addr_h, uint8_t addr_l, uint8_t len_field) {
+    if (!Debug4wayTrace) return;
+    char buf[128];
+    const char *cmd_name = "UNKNOWN";
+    switch (cmd) {
+        case kCmdInterfaceTestAlive: cmd_name = "TestAlive"; break;
+        case kCmdProtocolGetVersion: cmd_name = "ProtocolGetVer"; break;
+        case kCmdInterfaceGetName: cmd_name = "GetName"; break;
+        case kCmdInterfaceGetVersion: cmd_name = "GetVer"; break;
+        case kCmdInterfaceExit: cmd_name = "Exit"; break;
+        case kCmdDeviceReset: cmd_name = "DeviceReset"; break;
+        case kCmdDeviceInitFlash: cmd_name = "InitFlash"; break;
+        case kCmdDeviceEraseAll: cmd_name = "EraseAll"; break;
+        case kCmdDevicePageErase: cmd_name = "PageErase"; break;
+        case kCmdDeviceRead: cmd_name = "DeviceRead"; break;
+        case kCmdDeviceWrite: cmd_name = "DeviceWrite"; break;
+        case kCmdDeviceReadEEprom: cmd_name = "ReadEEPROM"; break;
+        case kCmdDeviceWriteEEprom: cmd_name = "WriteEEPROM"; break;
+        case kCmdInterfaceSetMode: cmd_name = "SetMode"; break;
+        case kCmdDeviceVerify: cmd_name = "DeviceVerify"; break;
+    }
+    // Pack addr into single u32 so format uses exactly 4 args: name, cmd, addr16, len
+    uint32_t addr16 = (static_cast<uint32_t>(addr_h) << 8) | addr_l;
+    hal_debug_printf_async("4WAY-RX: %s (0x%02X) addr=0x%04X len=%u\r\n",
+                           reinterpret_cast<uint32_t>(cmd_name), cmd, addr16, len_field);
+}
+
+static void log_4way_tx(uint8_t cmd, uint8_t ack, uint8_t len) {
+    if (!Debug4wayTrace) return;
+    const char *ack_name = "ERROR";
+    switch(ack) {
+        case kAckOk: ack_name = "OK"; break;
+        case kAckInvalidCmd: ack_name = "InvCmd"; break;
+        case kAckInvalidCrc: ack_name = "InvCRC"; break;
+        case kAckVerifyError: ack_name = "VerifyErr"; break;
+        case kAckInvalidChannel: ack_name = "InvChan"; break;
+        case kAckInvalidParam: ack_name = "InvParam"; break;
+        case kAckGeneralError: ack_name = "GenErr"; break;
+    }
+    hal_debug_printf_async("4WAY-TX: ack=%s (0x%02X) outLen=%u\r\n",
+                           reinterpret_cast<uint32_t>(ack_name), ack, len, 0);
+}
+
+// BLHeli_S EEPROM known offsets (for Silabs/Atmel layout)
+// Reference: BLHeli_S source / BLHeli configurator source
+static constexpr uint8_t BLHELI_EEPROM_MOTOR_DIRECTION  = 9;   // 1=Normal, 2=Reversed, 3=Bidirectional
+static constexpr uint8_t BLHELI_EEPROM_PWM_FREQUENCY    = 10;  // 1=High, 2=Low, 3=DShot
+static constexpr uint8_t BLHELI_EEPROM_STARTUP_POWER    = 11;  // 1-8
+static constexpr uint8_t BLHELI_EEPROM_MOTOR_TIMING     = 13;  // 1-5 (Low..VeryHigh)
+static constexpr uint8_t BLHELI_EEPROM_DEMAG_COMP       = 14;  // 1=Off, 2=Low, 3=High
+static constexpr uint8_t BLHELI_EEPROM_BRAKE_ON_STOP    = 21;  // 0=Off, 1=On
+static constexpr uint8_t BLHELI_EEPROM_LED_CONTROL      = 22;  // bitmask
+static constexpr uint8_t BLHELI_EEPROM_MIN_EEPROM_LEN   = 24;
+
+static void log_blheli_eeprom(const uint8_t *data, uint16_t len, const char *prefix) {
+    if (!Debug4wayTrace || !data || len < BLHELI_EEPROM_MIN_EEPROM_LEN) return;
+
+    // Direction
+    static const char * const dir_str[] = {"?", "Normal", "Reversed", "Bidir", "BidirRev"};
+    const uint8_t dir = data[BLHELI_EEPROM_MOTOR_DIRECTION];
+    const char *dir_name = (dir < 5) ? dir_str[dir] : "?";
+
+    // Timing
+    static const char * const timing_str[] = {"?", "Low", "MedLow", "Medium", "MedHigh", "High"};
+    const uint8_t timing = data[BLHELI_EEPROM_MOTOR_TIMING];
+    const char *timing_name = (timing < 6) ? timing_str[timing] : "?";
+
+    // Demag
+    static const char * const demag_str[] = {"?", "Off", "Low", "High"};
+    const uint8_t demag = data[BLHELI_EEPROM_DEMAG_COMP];
+    const char *demag_name = (demag < 4) ? demag_str[demag] : "?";
+
+    hal_debug_puts(prefix);
+    hal_debug_printf_async("  Direction:   %s (%d)\r\n",
+        reinterpret_cast<uint32_t>(dir_name), dir, 0, 0);
+    hal_debug_printf_async("  PWM mode:    %d  StartPwr: %d\r\n",
+        data[BLHELI_EEPROM_PWM_FREQUENCY], data[BLHELI_EEPROM_STARTUP_POWER], 0, 0);
+    hal_debug_printf_async("  Timing:      %s (%d)\r\n",
+        reinterpret_cast<uint32_t>(timing_name), timing, 0, 0);
+    hal_debug_printf_async("  DemagComp:   %s  BrakeStop: %d\r\n",
+        reinterpret_cast<uint32_t>(demag_name), data[BLHELI_EEPROM_BRAKE_ON_STOP], 0, 0);
+    hal_debug_printf_async("  LED mask:    0x%02X\r\n",
+        data[BLHELI_EEPROM_LED_CONTROL], 0, 0, 0);
 }
 
 static void host_write_byte(uint8_t value) {
@@ -295,6 +381,9 @@ static bool bl_read_command(uint8_t cmd, IoMem &mem) {
     if (!bl_send_cmd_set_address(mem)) {
         return false;
     }
+    if (Debug4wayTrace) {
+        hal_debug_printf_async("ESC-BOOT: ReadFlash cmd=%02X len=%u\r\n", cmd, mem.num_bytes, 0, 0);
+    }
     const uint8_t read_cmd[] = {cmd, mem.num_bytes};
     esc_write_buffer(read_cmd, sizeof(read_cmd), true);
 
@@ -309,6 +398,9 @@ static bool bl_read_command(uint8_t cmd, IoMem &mem) {
 static bool bl_write_command(uint8_t cmd, IoMem &mem, uint32_t timeout_us) {
     if (!bl_send_cmd_set_address(mem) || !bl_send_cmd_set_buffer(mem)) {
         return false;
+    }
+    if (Debug4wayTrace) {
+        hal_debug_printf_async("ESC-BOOT: WriteFlash cmd=%02X len=%u\r\n", cmd, mem.num_bytes, 0, 0);
     }
     const uint8_t write_cmd[] = {cmd, 0x01};
     esc_write_buffer(write_cmd, sizeof(write_cmd), true);
@@ -396,6 +488,16 @@ static bool bl_connect(DeviceInfo *out_info) {
         candidate.bytes[3] = detected_mode;
         *out_info = candidate;
         g_current_interface_mode = detected_mode;
+
+        if (Debug4wayTrace) {
+            const char *m_str = (detected_mode == kInterfaceModeSilabs) ? "Silabs" : 
+                                (detected_mode == kInterfaceModeAtmel) ? "Atmel" : 
+                                (detected_mode == kInterfaceModeArm) ? "ARM" : "Unknown";
+            hal_debug_printf_critical("ESC-BOOT: Connected! Type=%s Sig=%02X%02X%02X\r\n",
+                     reinterpret_cast<uint32_t>(m_str),
+                     candidate.bytes[2], candidate.bytes[1], candidate.bytes[0]);
+        }
+
         return true;
     }
 
@@ -442,13 +544,10 @@ static void handle_frame(uint8_t cmd,
                          const uint8_t *payload,
                          uint8_t payload_len_field,
                          bool valid_crc) {
-    if (Debug4wayTrace) {
-        debug_uart::writef_ts("4WAY RX cmd=%u ah=%u al=%u len=%u crcok=%u\r\n",
-                              cmd,
-                              addr_h,
-                              addr_l,
-                              payload_len_field,
-                              valid_crc ? 1u : 0u);
+    if (!valid_crc) {
+        hal_debug_puts("4WAY-RX: CRC ERROR\r\n");
+    } else {
+        log_4way_rx(cmd, addr_h, addr_l, payload_len_field);
     }
 
     uint8_t ack = valid_crc ? kAckOk : kAckInvalidCrc;
@@ -497,9 +596,7 @@ static void handle_frame(uint8_t cmd,
             case kCmdInterfaceExit:
                 g_device_info = {};
                 host_write_response(cmd, addr_h, addr_l, out_payload, out_len_field, out_count, ack);
-                if (Debug4wayTrace) {
-                    debug_uart::write_ts("4WAY TX cmd=52 ack=0 (exit)\r\n");
-                }
+                hal_debug_puts("4WAY-TX: Exit Command Acknowledged\r\n");
                 esc_passthrough_end();
                 esc_4way_reset();
                 return;
@@ -624,6 +721,8 @@ static void handle_frame(uint8_t cmd,
                 }
                 out_len_field = io_mem.num_bytes;
                 out_count = effective_frame_length(io_mem.num_bytes);
+                // Decode and log the ESC config EEPROM for debugging
+                log_blheli_eeprom(dummy, out_count, "[ESC CFG READ]\r\n");
                 if (payload[0] == 0) {
                     host_write_response(cmd, addr_h, addr_l, dummy, 0, 256, ack);
                     return;
@@ -651,6 +750,8 @@ static void handle_frame(uint8_t cmd,
                     ack = kAckInvalidCmd;
                     break;
                 }
+                // Log what config is being written BEFORE sending to ESC
+                log_blheli_eeprom(payload, payload_len_field, "[ESC CFG WRITE]\r\n");
                 io_mem.num_bytes = payload_len_field;
                 io_mem.data = const_cast<uint8_t *>(payload);
                 if (!bl_write_command(kBootCmdProgEeprom, io_mem, kEscLongTimeoutUs)) {
@@ -693,12 +794,7 @@ static void handle_frame(uint8_t cmd,
     }
 
     host_write_response(cmd, addr_h, addr_l, out_payload, out_len_field, out_count, ack);
-    if (Debug4wayTrace) {
-        debug_uart::writef_ts("4WAY TX cmd=%u ack=%u outLen=%u\r\n",
-                              cmd,
-                              ack,
-                              out_len_field);
-    }
+    log_4way_tx(cmd, ack, out_len_field);
 }
 
 static void process_host_byte(uint8_t byte) {

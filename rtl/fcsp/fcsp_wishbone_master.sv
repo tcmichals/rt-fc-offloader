@@ -6,7 +6,9 @@
 // Consumes FCSP CONTROL frames (READ_BLOCK, WRITE_BLOCK, PING, HELLO)
 // from the FCSP Router stream and executes direct Wishbone bus cycles
 // to memory-mapped IO engines (DSHOT, NEO, PWM).
-module fcsp_wishbone_master (
+module fcsp_wishbone_master #(
+    parameter int WB_TIMEOUT_CYCLES = 1000  // Wishbone timeout protection
+) (
     input  wire        clk,
     input  wire        rst,
 
@@ -38,7 +40,10 @@ module fcsp_wishbone_master (
     output logic        wb_cyc_o,
     output logic        wb_stb_o,
     input  wire        wb_ack_i,
-    input  wire [31:0] wb_dat_i
+    input  wire [31:0] wb_dat_i,
+
+    // Status outputs
+    output logic        o_wb_timeout
 );
     localparam logic [7:0] OP_PING        = 8'h06;
     localparam logic [7:0] OP_READ_BLOCK  = 8'h10;
@@ -76,13 +81,14 @@ module fcsp_wishbone_master (
     logic [15:0] rsp_idx;
 
     logic [1:0] byte_idx; // Used for multi-byte field extraction
-    logic [7:0] wb_byte_offset;
+    logic [15:0] wb_byte_offset;
         // Saved copy of s_cmd_tlast from the last consumed payload byte.
         // s_cmd_tlast may be de-asserted by the source before the WB operation
         // completes, so we latch it here for use in ST_WB_READ_EXEC /
         // ST_WB_WRITE_EXEC.
         logic cmd_was_last;
     logic tid_latched;
+    logic [31:0] wb_timeout_cnt;
 
     always_comb begin
         s_cmd_tready = 1'b0;
@@ -142,12 +148,15 @@ module fcsp_wishbone_master (
             wb_adr_o <= 32'h0;
             wb_dat_o <= 32'h0;
             wb_sel_o <= 4'h0;
-            wb_byte_offset <= 8'h0;
+            wb_byte_offset <= 16'h0;
                 cmd_was_last <= 1'b0;
             tid_latched <= 1'b0;
+            wb_timeout_cnt <= 32'd0;
+            o_wb_timeout <= 1'b0;
         end else begin
             unique case (st)
                 ST_IDLE: begin
+                    wb_timeout_cnt <= 32'd0;
                     if (s_cmd_tvalid) begin
                         op <= s_cmd_tdata;
                         op_is_write <= (s_cmd_tdata == OP_WRITE_BLOCK);
@@ -217,8 +226,9 @@ module fcsp_wishbone_master (
                         if (byte_idx == 2'd1) begin
                             // Finished fetching standard packet header.
                             wb_adr_o <= addr;
-                            wb_byte_offset <= 8'd0;
-                            
+                            wb_byte_offset <= 16'd0;
+                            wb_timeout_cnt <= 32'd0;
+
                             if (op_is_write) begin
                                 byte_idx <= 2'd0;
                                 wb_dat_o <= 32'h0;
@@ -240,17 +250,17 @@ module fcsp_wishbone_master (
                         // Map byte stream into 32-bit Wishbone word
                         logic [1:0] shift;
                         shift = wb_byte_offset[1:0];
-                        
+
                         unique case(shift)
                             2'd0: begin wb_dat_o[31:24] <= s_cmd_tdata; wb_sel_o[3] <= 1'b1; end
                             2'd1: begin wb_dat_o[23:16] <= s_cmd_tdata; wb_sel_o[2] <= 1'b1; end
                             2'd2: begin wb_dat_o[15:8]  <= s_cmd_tdata; wb_sel_o[1] <= 1'b1; end
                             2'd3: begin wb_dat_o[7:0]   <= s_cmd_tdata; wb_sel_o[0] <= 1'b1; end
                         endcase
-                        
-                        wb_byte_offset <= wb_byte_offset + 8'd1;
+
+                        wb_byte_offset <= wb_byte_offset + 16'd1;
                         // Execute cycle if we filled 4 bytes, or reached the end of payload length
-                        if (shift == 2'd3 || wb_byte_offset + 8'd1 == len[7:0] || s_cmd_tlast) begin
+                        if (shift == 2'd3 || wb_byte_offset + 16'd1 == len || s_cmd_tlast) begin
                                 cmd_was_last <= s_cmd_tlast;
                             st <= ST_WB_WRITE_EXEC;
                         end
@@ -258,8 +268,16 @@ module fcsp_wishbone_master (
                 end
 
                 ST_WB_WRITE_EXEC: begin
-                    if (wb_ack_i) begin
-                        if (wb_byte_offset == len[7:0] || cmd_was_last) begin
+                    // Timeout protection
+                    if (wb_timeout_cnt >= WB_TIMEOUT_CYCLES[31:0]) begin
+                        o_wb_timeout <= 1'b1;
+                        rsp_buf[0] <= RES_NOT_SUPPORTED; // Timeout error
+                        rsp_len <= 16'd1;
+                        rsp_idx <= 16'd0;
+                        st <= ST_RSP_SEND;
+                    end else if (wb_ack_i) begin
+                        wb_timeout_cnt <= 32'd0;
+                        if (wb_byte_offset == len || cmd_was_last) begin
                             rsp_buf[0] <= RES_OK;
                             rsp_buf[1] <= len[15:8];
                             rsp_buf[2] <= len[7:0];
@@ -273,21 +291,45 @@ module fcsp_wishbone_master (
                             byte_idx <= 2'd0;
                             st <= ST_WB_WRITE_DATA;
                         end
+                    end else begin
+                        wb_timeout_cnt <= wb_timeout_cnt + 32'd1;
                     end
                 end
 
                 ST_WB_READ_EXEC: begin
-                    if (wb_ack_i) begin
-                        rsp_buf[0] <= RES_OK;
-                        rsp_buf[1] <= 8'h00;
-                        rsp_buf[2] <= 8'h04;
-                        rsp_buf[3] <= wb_dat_i[31:24];
-                        rsp_buf[4] <= wb_dat_i[23:16];
-                        rsp_buf[5] <= wb_dat_i[15:8];
-                        rsp_buf[6] <= wb_dat_i[7:0];
-                        rsp_len <= 16'd7;
+                    // Timeout protection
+                    if (wb_timeout_cnt >= WB_TIMEOUT_CYCLES[31:0]) begin
+                        o_wb_timeout <= 1'b1;
+                        rsp_buf[0] <= RES_NOT_SUPPORTED; // Timeout error
+                        rsp_len <= 16'd1;
                         rsp_idx <= 16'd0;
-                        st <= cmd_was_last ? ST_RSP_SEND : ST_DISCARD_CMD;
+                        st <= ST_RSP_SEND;
+                    end else if (wb_ack_i) begin
+                        wb_timeout_cnt <= 32'd0;
+                        rsp_buf[wb_byte_offset + 3] <= wb_dat_i[31:24];
+                        rsp_buf[wb_byte_offset + 4] <= wb_dat_i[23:16];
+                        rsp_buf[wb_byte_offset + 5] <= wb_dat_i[15:8];
+                        rsp_buf[wb_byte_offset + 6] <= wb_dat_i[7:0];
+                        
+                        wb_byte_offset <= wb_byte_offset + 16'd4;
+                        
+                        if (wb_byte_offset + 16'd4 >= len || wb_byte_offset + 16'd4 >= 16'd29) begin
+                            logic [15:0] actual_len;
+                            actual_len = (wb_byte_offset + 16'd4 >= 16'd29) ? 16'd29 :
+                                         (len > 16'd0) ? len : 16'd4; // Default to 4 if len=0
+                            
+                            rsp_buf[0] <= RES_OK;
+                            rsp_buf[1] <= actual_len[15:8];
+                            rsp_buf[2] <= actual_len[7:0];
+                            rsp_len <= actual_len + 16'd3;
+                            rsp_idx <= 16'd0;
+                            st <= cmd_was_last ? ST_RSP_SEND : ST_DISCARD_CMD;
+                        end else begin
+                            wb_adr_o <= wb_adr_o + 32'd4;
+                            st <= ST_WB_READ_EXEC; // execute next cycle
+                        end
+                    end else begin
+                        wb_timeout_cnt <= wb_timeout_cnt + 32'd1;
                     end
                 end
 

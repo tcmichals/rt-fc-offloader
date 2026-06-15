@@ -119,12 +119,19 @@ async def test_sniffer_triggers_passthrough_on_f5_and_64(dut):
 
     assert int(dut.mux_sel.value) == 1
 
+    # Enable auto_passthrough_en (bit 5) and keep reg_mux_sel=1 (bit 0)
+    await _wb_write(dut, (1 << 5) | (1 << 0))
+
     await _send_sniffer_trigger(dut, 0xF5)
     for _ in range(10):
         await RisingEdge(dut.clk)
     assert int(dut.mux_sel.value) == 0, "0xF5 trigger should force serial mode"
 
     await _reset(dut)
+
+    # Enable auto_passthrough_en (bit 5) and keep reg_mux_sel=1 (bit 0)
+    await _wb_write(dut, (1 << 5) | (1 << 0))
+
     await _send_sniffer_trigger(dut, 0x64)
     for _ in range(10):
         await RisingEdge(dut.clk)
@@ -212,6 +219,9 @@ async def test_msp_bypass_stays_enabled_across_multiple_messages(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await _reset(dut)
 
+    # Enable auto_passthrough_en (bit 5) and keep reg_mux_sel=1 (bit 0)
+    await _wb_write(dut, (1 << 5) | (1 << 0))
+
     await _send_sniffer_trigger(dut, 0xF5)
     for _ in range(10):
         await RisingEdge(dut.clk)
@@ -233,6 +243,8 @@ async def test_watchdog_timeout_and_activity_reset(dut):
 
     # Enter serial mode via auto-passthrough (MSP sniffer trigger);
     # watchdog only applies to auto-passthrough, not manual mode.
+    # Enable auto_passthrough_en (bit 5) and keep reg_mux_sel=1 (bit 0)
+    await _wb_write(dut, (1 << 5) | (1 << 0))
     await _send_sniffer_trigger(dut, 0xF5)
     for _ in range(10):
         await RisingEdge(dut.clk)

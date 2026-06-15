@@ -92,7 +92,7 @@ USB ingress is directly from `fcsp_uart_byte_stream` at board level — no modul
 | Bit order | MSB-first |
 | Data width | 8-bit byte-oriented |
 | Duplex | Full-duplex (MOSI + MISO simultaneous) |
-| FPGA role | **Slave** — Pico is SPI master |
+| FPGA role | **Slave** — PC/RPi is SPI master |
 | CDC | SCLK/CS: 3-FF sync; MOSI: 2-FF sync |
 | Max SCLK | Conservative rule: ≤ sys_clk/4 = **13.5 MHz** (at 54 MHz sys_clk) |
 | RTL module | `fcsp_spi_frontend` → wraps `spi_slave` |
@@ -162,7 +162,7 @@ To ensure Verilator compliance and hardware stability, the following rules apply
 | Byte selects | 4-bit (`wb_sel`) |
 | Pipelining | **None** — single outstanding transaction |
 | Ack model | Slave asserts `ack` for 1 cycle; master waits |
-| Error signals | **None** — no `wb_err_i` / timeout |
+| Error signals | **Internal timeout** (`o_wb_timeout`) after `WB_TIMEOUT_CYCLES` (1000) |
 | Bus master | `fcsp_wishbone_master` (inside `fcsp_offloader_top`) |
 | Bus decoder | `wb_io_bus` (inside `fcsp_io_engines`) |
 | RTL signals | `int_wb_adr`, `int_wb_dat_m2s`, `int_wb_dat_s2m`, `int_wb_sel`, `int_wb_we`, `int_wb_cyc`, `int_wb_stb`, `int_wb_ack` |
@@ -252,13 +252,12 @@ HOST → FCSP frame CH 0x05 → fcsp_parser → fcsp_crc_gate → fcsp_router
 ### 2.3 SPI TX Egress
 
 ```
-fcsp_tx_framer → tx_wire_* → USB TX byte stream
-                            ↘ (future) → fcsp_spi_frontend TX → SPI MISO
+fcsp_tx_framer → tx_wire_* → Dual Egress Router
+                            ├─► USB TX byte stream (always)
+                            └─► SPI MISO (when CS active + TDEST matches)
 ```
 
-**Status: USB-ONLY.** `tx_wire_tready` is wired directly to `i_usb_tx_ready`. SPI TX egress path exists in hardware (`fcsp_spi_frontend` has full TX support) but `spi_tx_valid = 1'b0`; the framer output is not routed to SPI MISO.
-
-**Channel-aware routing stub:** `fcsp_offloader_top` latches `tx_arb_channel` into `tx_frame_channel_latched` when the framer accepts a new frame. The signal `tx_route_spi_control` is derived (`== CH_CONTROL`) but currently unused. When SPI egress is enabled, this will gate whether a given frame exits via USB or SPI MISO.
+**Status: DUAL EGRESS.** Egress routing is dynamic based on `TDEST` (latched from the request). If a frame arrived via SPI, its response is routed to SPI MISO (if CS is still active) while also echoing to USB. If it arrived via USB, it only exits via USB.
 
 ### 2.4 Channels 0x02, 0x03 (Telemetry, FC_Log)
 
@@ -477,6 +476,7 @@ For a typical CTRL READ_BLOCK response (7 payload bytes):
 | `0x0C` | CH3_WIDTH | R | Channel 3 |
 | `0x10` | CH4_WIDTH | R | Channel 4 |
 | `0x14` | CH5_WIDTH | R | Channel 5 |
+| `0x18` | STATUS | R | `[5:0]` = per-channel ready flags |
 
 ### 5.3 DShot Controller (`0x40000300`)
 
@@ -486,8 +486,8 @@ For a typical CTRL READ_BLOCK response (7 payload bytes):
 | `0x04` | MOTOR2_RAW | W | Motor 2 |
 | `0x08` | MOTOR3_RAW | W | Motor 3 |
 | `0x0C` | MOTOR4_RAW | W | Motor 4 |
-| `0x10` | CONFIG | RW | `[1:0]` = DShot mode (150/300/600) |
-| `0x14` | STATUS | R | `[3:0]` = per-motor ready bits |
+| `0x10` | STATUS | R | `[3:0]` = per-motor ready bits, `[4]` = wdt_expired |
+| `0x14` | CONFIG | RW | `[1:0]` = DShot mode (150/300/600) |
 
 > **Note:** Smart throttle registers (`0x40`–`0x4C`) are defined in Python `hwlib/registers.py` but not yet implemented in RTL. See section 12.3 for implementation plan. Only raw 16-bit word writes exist currently.
 
@@ -501,6 +501,7 @@ Single register at offset `0x00`:
 | `[2:1]` | `mux_ch` | `0` | Motor channel select (0–3) |
 | `[3]` | `msp_mode` | `0` | 0 = passthrough, 1 = MSP FC protocol |
 | `[4]` | `force_low` | `0` | Drive selected motor pin LOW (ESC bootloader break) |
+| `[5]` | `auto_passthrough_en` | `0` | Enable MSP sniff auto-override |
 
 ### 5.5 NeoPixel (`0x40000600`)
 

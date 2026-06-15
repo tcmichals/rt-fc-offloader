@@ -27,6 +27,9 @@ void     hal_critical_section_exit(void);
 void     hal_debug_putc(char c);
 void     hal_debug_puts(const char* s);
 void     hal_debug_hex(uint32_t val);
+void     hal_debug_printf_async(const char* fmt, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4);
+void     hal_debug_printf_critical(const char* fmt, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4);
+void     hal_debug_printf_v(const char* fmt, const uint32_t* args, uint8_t arg_count);
 
 /* --- LED Control --- */
 void     hal_led_init(void);

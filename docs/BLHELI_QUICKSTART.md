@@ -63,3 +63,25 @@ If the Python process crashes or the configurator disconnects, the MSP sniffer w
 | Bootloader break | `0x40000400 = 0x14` | Selected motor pad forced LOW (hold ≥20 ms, then release) |
 
 > **Detailed passthrough sequence and bootloader entry:** [DESIGN.md](DESIGN.md) §6
+
+## Python Example
+
+A working Python example for ESC communication is available at `python/hw/example_esc_flash.py`. This script demonstrates:
+
+- Switching to serial mode on a target motor
+- Asserting break to enter ESC bootloader
+- Sending BLHeli 4-way commands
+- Restoring DShot mode
+
+**Usage:**
+```bash
+python3 python/hw/example_esc_flash.py --port /dev/ttyUSB0 --motor 0
+```
+
+**Options:**
+- `--port`: Serial port (default: `/dev/ttyUSB0`)
+- `--baud`: FCSP baud rate (default: `115200`)
+- `--motor`: Motor channel 0-3 (default: `0`)
+- `--break-ms`: Break hold time in ms (default: `50`)
+
+For full ESC passthrough testing with EEPROM reading, see `python/hw/test_hw_esc_passthrough.py`.

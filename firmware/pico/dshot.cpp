@@ -2,7 +2,6 @@
 #include "dshot.pio.h"
 #include "hardware/clocks.h"
 #include "hardware/gpio.h"
-#include <vector>
 
 namespace {
 
@@ -45,6 +44,12 @@ void dshot_init() {
     for (int i = 0; i < dshot::MaxMotors; i++) {
         uint pin = motor_pins[i];
         int sm = pio_claim_unused_sm(dshot::Inst, true);
+        if (sm < 0) {
+            // Failed to claim state machine - mark motor as unconfigured
+            motors[i] = {pin, 0, offset, false};
+            outgoing_packet[i] = -1;
+            continue;
+        }
         pio_sm_config config = dshot_600_program_get_default_config(offset);
         sm_config_set_set_pins(&config, pin, 1);
         pio_gpio_init(dshot::Inst, pin);

@@ -439,3 +439,41 @@ async def test_back_to_back_tx(dut):
     await c2
 
     assert result2[0] == byte2, f"Second TX byte: expected 0x{byte2:02x}, got 0x{result2[0]:02x}"
+
+
+@cocotb.test()
+async def test_rx_backpressure_halts_fsm(dut):
+    """If downstream m_esc_tready is low, RX FSM holds in RX_WAIT_STREAM without losing data."""
+    cocotb.start_soon(Clock(dut.clk, SIM_CLK_NS, unit="ns").start())
+    await _reset(dut)
+
+    await _wb_write(dut, 0x0C, SIM_BAUD_DIV)
+
+    # Deassert ready
+    dut.m_esc_tready.value = 0
+
+    test_byte = 0x89
+    await _drive_uart_rx(dut, test_byte, SIM_BAUD_DIV)
+
+    # Allow a few clocks for FSM to latch into WAIT state
+    for _ in range(10):
+        await RisingEdge(dut.clk)
+
+    # Verify data is valid but held
+    assert int(dut.m_esc_tvalid.value) == 1, "m_esc_tvalid should assert even if tready is low"
+    assert int(dut.m_esc_tdata.value) == test_byte, "m_esc_tdata should hold the received byte"
+
+    # Hold it for 50 cycles to prove it doesn't get dropped
+    for _ in range(50):
+        await RisingEdge(dut.clk)
+    
+    assert int(dut.m_esc_tvalid.value) == 1, "m_esc_tvalid should remain asserted while waiting"
+
+    # Now assert ready
+    dut.m_esc_tready.value = 1
+    await RisingEdge(dut.clk)
+    await RisingEdge(dut.clk)
+    await ReadOnly()
+    
+    # In the next cycle, the stream should complete the handshake and go idle
+    assert int(dut.m_esc_tvalid.value) == 0, "m_esc_tvalid should clear after handshake completes"

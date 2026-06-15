@@ -62,7 +62,6 @@ This channel is a binary "tunnel" for high-volume ESC configuration (MSP, 4-Way)
 
 ## 3. Production Memory Map (Wishbone)
 
-**Addressing note:** this repo uses both absolute addresses (e.g., `0x40000400`) and relative register offsets (e.g., `0x0020`) in different docs. They refer to the same registers via base + offset mapping.
 
 | Absolute Address | Relative Offset | Peripheral | Feature | Description |
 |---|---|---|---|

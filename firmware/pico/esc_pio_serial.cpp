@@ -88,7 +88,14 @@ bool esc_pio_serial_start(uint pin, uint32_t baud) {
     gpio_set_pulls(s.pin, true, false);
 
     s.offset_tx = pio_add_program(EscPio, &esc_uart_tx_program);
+    if (s.offset_tx == -1) {
+        return false;
+    }
     s.offset_rx = pio_add_program(EscPio, &esc_uart_rx_program);
+    if (s.offset_rx == -1) {
+        pio_remove_program(EscPio, &esc_uart_tx_program, s.offset_tx);
+        return false;
+    }
 
     configure_tx_sm();
     configure_rx_sm();
@@ -117,8 +124,8 @@ void esc_pio_serial_write_byte(uint8_t value) {
     tx_enable_drive();
     pio_sm_put_blocking(EscPio, s.sm_tx, value);
 
-    // 10 bits at current baud (+ small guard)
-    const uint32_t frame_us = (1000000u * 10u) / (s.baud ? s.baud : 1u);
+    // Wait for 12 bit times to ensure the PIO program finishes (pull + start + 8 data + stop + margin)
+    const uint32_t frame_us = (1000000u * 12u) / (s.baud ? s.baud : 1u);
     sleep_us(frame_us + 20u);
 
     tx_release_line();

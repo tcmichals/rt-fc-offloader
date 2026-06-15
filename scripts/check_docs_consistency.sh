@@ -32,9 +32,15 @@ for ch in 0x01 0x02 0x03 0x04 0x05; do
   fi
 done
 
-# Address aliasing must remain explicit for serial mux register.
-if ! grep -q '0x40000400' docs/FCSP_PROTOCOL.md || ! grep -q '0x0020' docs/FCSP_PROTOCOL.md; then
-  echo "❌ docs consistency check failed: expected absolute+relative address notation not found"
+# Serial mux register must match python definition
+MUX_REG=$(grep -oP 'MUX_CTRL\s*=\s*\K(0x[0-9a-fA-F]+)' python/hw/hwlib/registers.py)
+if [ -z "$MUX_REG" ]; then
+  echo "❌ docs consistency check failed: could not extract MUX_CTRL from registers.py"
+  exit 1
+fi
+
+if ! grep -qi "$MUX_REG" docs/FCSP_PROTOCOL.md; then
+  echo "❌ docs consistency check failed: expected serial mux register $MUX_REG not found in docs/FCSP_PROTOCOL.md"
   exit 1
 fi
 

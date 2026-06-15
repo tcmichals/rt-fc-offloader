@@ -161,28 +161,7 @@ static void debug_log_int(const char *prefix, int val) {
 }
 
 static void debug_puts_decimal(int val) {
-    if (val < 0) {
-        hal_debug_putc('-');
-        val = -val;
-    }
-    char buf[11];
-    int pos = 0;
-    if (val == 0) {
-        buf[pos++] = '0';
-    } else {
-        int divisor = 1000000000;
-        bool started = false;
-        while (divisor >= 1) {
-            int digit = (val / divisor) % 10;
-            if (digit != 0 || started) {
-                buf[pos++] = '0' + digit;
-                started = true;
-            }
-            divisor /= 10;
-        }
-    }
-    buf[pos] = '\0';
-    hal_debug_puts(buf);
+    hal_debug_printf_async("%d", val, 0, 0, 0);
 }
 
 static void debug_logf(const char *fmt, int a, int b = 0) {
@@ -501,19 +480,9 @@ static bool handle_query_command(uint16_t cmd_raw,
             // MSP_MOTOR and filtering values > 0. If all channels are 0 at
             // startup, only a subset may appear. Report 4 present channels
             // consistently when idle by using a neutral placeholder.
-            uint16_t raw[4]{};
-            bool any_nonzero = false;
             for (uint8_t i = 0; i < 4; ++i) {
-                raw[i] = static_cast<uint16_t>(hal_spi_get_motor_command(i));
-                if (raw[i] != 0u) {
-                    any_nonzero = true;
-                }
-            }
-
-            for (uint8_t i = 0; i < 4; ++i) {
-                const uint16_t m = any_nonzero ? raw[i] : static_cast<uint16_t>(1000u);
-                reply[i * 2u] = static_cast<uint8_t>(m & 0xFFu);
-                reply[i * 2u + 1u] = static_cast<uint8_t>((m >> 8) & 0xFFu);
+                reply[i * 2u] = static_cast<uint8_t>(1000u & 0xFFu);
+                reply[i * 2u + 1u] = static_cast<uint8_t>((1000u >> 8) & 0xFFu);
             }
             msp_send_reply_auto(cmd_raw, reply, 8, is_v2, v2_flags, v2_in_v1);
             return true;
@@ -521,9 +490,8 @@ static bool handle_query_command(uint16_t cmd_raw,
 
         case static_cast<uint16_t>(msp::Command::Rc):
             for (int i = 0; i < 18; i++) {
-                uint16_t us = (i < 6) ? hal_pwm_get_us(i) : 1500;
-                reply[i * 2] = us & 0xFF;
-                reply[i * 2 + 1] = us >> 8;
+                reply[i * 2] = 1500 & 0xFF;
+                reply[i * 2 + 1] = 1500 >> 8;
             }
             msp_send_reply_auto(cmd_raw, reply, 36, is_v2, v2_flags, v2_in_v1);
             return true;
@@ -612,23 +580,19 @@ static void handle_set_passthrough_command(uint16_t cmd_raw,
         }
         if (esc_passthrough_begin(motor_idx)) {
             ++g_passthrough_begin_ok_count;
-            hal_debug_puts("ESC --> passthrough begin motor=");
-            debug_puts_decimal(motor_idx);
-            hal_debug_puts(" ok=1\r\n");
+            hal_debug_printf_critical("\r\n==[ MSP -> ESC 4-WAY BRIDGE: motor=%d ]==========\r\n", motor_idx, 0, 0, 0);
             esc_4way_reset();
             reply[0] = esc_4way_esc_count();
         } else {
             ++g_passthrough_begin_fail_count;
-            hal_debug_puts("ESC --> passthrough begin motor=");
-            debug_puts_decimal(motor_idx);
-            hal_debug_puts(" ok=0\r\n");
+            hal_debug_printf_critical("ESC passthrough begin FAILED motor=%d\r\n", motor_idx, 0, 0, 0);
             esc_4way_reset();
             reply[0] = 0;
         }
     } else {
         if (esc_passthrough_active()) {
             esc_passthrough_end();
-            debug_puts("ESC --> passthrough end\r\n");
+            hal_debug_printf_critical("==[ ESC 4-WAY BRIDGE EXIT (manual) ]=============\r\n", 0, 0, 0, 0);
         }
         esc_4way_reset();
         reply[0] = 0;
@@ -777,16 +741,7 @@ void msp_init() {
     msp_init_led();
     if (DebugStartupBanner) {
         const uint8_t id = build_id_byte();
-        char line[8];
-        line[0] = 'b';
-        line[1] = 'l';
-        line[2] = 'd';
-        line[3] = ':';
-        line[4] = hex_digit(static_cast<uint8_t>(id >> 4));
-        line[5] = hex_digit(id);
-        line[6] = '\n';
-        line[7] = '\0';
-        hal_debug_puts(line);
+        hal_debug_printf_async("bld:%02X\n", id, 0, 0, 0);
     }
 }
 
@@ -810,7 +765,7 @@ PT_THREAD(msp_task(struct pt *pt)) {
                 parse_state = ParseState::WaitDollar;
                 ++g_passthrough_auto_exit_count;
                 if (debug_basic_enabled() && DebugCommandLog) {
-                    hal_debug_puts("MSP 4WAY idle timeout -> exit passthrough\r\n");
+                    hal_debug_printf_critical("==[ ESC 4-WAY BRIDGE EXIT (idle timeout) ]========\r\n", 0, 0, 0, 0);
                 }
             }
             PT_YIELD(pt);
@@ -904,10 +859,7 @@ PT_THREAD(msp_task(struct pt *pt)) {
                     hal_debug_puts("MSP !! crc mismatch cmd=");
                     debug_puts_decimal(rx_cmd);
                     hal_debug_puts(" rx=0x");
-                    char hbuf[3];
-                    snprintf(hbuf, sizeof(hbuf), "%02X", byte);
-                    hal_debug_puts(hbuf);
-                    hal_debug_puts("\r\n");
+                    hal_debug_printf_async("%02X\r\n", byte, 0, 0, 0);
                 }
                 ++g_crc_error_count;
             }
@@ -965,10 +917,7 @@ PT_THREAD(msp_task(struct pt *pt)) {
                     hal_debug_puts("MSP !! v2 crc mismatch cmd=");
                     debug_puts_decimal(rx_cmd);
                     hal_debug_puts(" rx=0x");
-                    char hbuf[3];
-                    snprintf(hbuf, sizeof(hbuf), "%02X", byte);
-                    hal_debug_puts(hbuf);
-                    hal_debug_puts("\r\n");
+                    hal_debug_printf_async("%02X\r\n", byte, 0, 0, 0);
                 }
                 ++g_v2_crc_error_count;
             }

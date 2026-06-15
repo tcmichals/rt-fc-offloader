@@ -17,9 +17,9 @@ module fcsp_debug_generator (
     input  wire [7:0]  i_router_chan,
 
     // FCSP Stream Output (Channel 0x04)
-    output wire        m_dbg_tvalid,
-    output wire [7:0]  m_dbg_tdata,
-    output wire        m_dbg_tlast,
+    output logic        m_dbg_tvalid,
+    output logic [7:0]  m_dbg_tdata,
+    output logic        m_dbg_tlast,
     input  wire        m_dbg_tready
 );
 

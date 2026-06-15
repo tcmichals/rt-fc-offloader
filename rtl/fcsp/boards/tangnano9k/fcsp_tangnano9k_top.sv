@@ -43,16 +43,7 @@ module fcsp_tangnano9k_top (
     inout  wire o_motor4,
 
     // NeoPixel output
-    output wire o_neopixel,
-
-    // Debug pins
-    output wire o_debug_0,
-    output wire o_debug_1,
-    output wire o_debug_2,
-    output wire o_debug_3,
-    output wire o_debug_4,
-    output wire o_debug_5,
-    output wire o_debug_6
+    output wire o_neopixel
 );
     parameter int LED_WIDTH = 5;
     parameter int SYS_CLK_HZ = 54_000_000;
@@ -204,7 +195,7 @@ module fcsp_tangnano9k_top (
     assign dbg_tx_seq = 16'h0000;
 
     fcsp_offloader_top #(
-        .MAX_PAYLOAD_LEN(256),
+        .MAX_PAYLOAD_LEN(64), // Shrunk from 256 to fit comfortably in Tang9K logic gates
         .CLK_FREQ_HZ(SYS_CLK_HZ),
         .NEO_LED_TYPE(1)  // SK6812 RGBW
     ) u_top (
@@ -291,22 +282,15 @@ module fcsp_tangnano9k_top (
     assign o_led_5 = led_reg_out[3];       // LED5: WB LED[3]
     assign o_led_6 = led_reg_out[4];       // LED6: WB LED[4]
 
-    // Debug pins — Full pipeline trace (7 active)
-    assign o_debug_0 = i_usb_uart_rx;                           // CH0 (32): Raw RX
-    assign o_debug_1 = parser_frame_done;                       // CH1 (31): Frame fully received
-    assign o_debug_2 = crc_ok;                                  // CH2 (49): CRC passed
-    assign o_debug_3 = crc_drop;                                // CH3: CRC failed/dropped
-    assign o_debug_4 = ctrl_tx_frame_seen;                      // CH4: Response sent to TX
-    assign o_debug_5 = o_usb_uart_tx;                           // CH5: Raw TX output
-    assign o_debug_6 = ctrl_tx_overflow;                        // CH6: TX overflow
-
     logic _unused_ok;
     always_comb begin
         _unused_ok = usb_rx_ready ^ usb_tx_byte[0]
                    ^ parser_len_error ^ parser_header_valid
-                   ^ parser_sync_seen
+                   ^ parser_sync_seen ^ parser_frame_done
                    ^ dbg_tx_tready
                    ^ dbg_tx_overflow ^ dbg_tx_frame_seen
+                   ^ ctrl_tx_overflow ^ ctrl_tx_frame_seen
+                   ^ crc_ok ^ crc_drop
                    ^ esc_tx_active
                    ^ i_rst_n;
     end

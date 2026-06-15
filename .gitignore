@@ -25,3 +25,14 @@ obj_dir/
 Thumbs.db
 .vscode/
 .idea/
+
+sim_build/
+results.xml
+
+# Gowin IDE artifacts
+impl/
+
+# Scratch and temporary files
+scratch.*
+fixtodo.md
+run_seeds.sh

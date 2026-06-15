@@ -17,30 +17,20 @@ This folder owns FCSP byte-stream fast-path logic.
 - `fcsp_router` — channel dispatch to per-channel FIFOs
 - `fcsp_rx_fifo` / `fcsp_tx_fifo` wrappers
 
-## Integration scaffolds now present
+## Key Modules
 
-- `fcsp_serv_bridge.sv`
-	- CONTROL-plane byte-stream seam between FCSP and SERV firmware endpoint
-	- models both directions (RX command ingress + TX response egress)
-- `fcsp_io_engines.sv`
-	- wrapper seam for lift/adapt engines:
-		- DSHOT output/mailbox path
-		- PWM decode path
-		- NeoPixel output path
 - `fcsp_offloader_top.sv`
-	- top integration scaffold showing both transport ends:
-		- SPI frontend path
-		- optional USB serial ingress/egress path
-	- includes parser observability, SERV bridge hookup, IO engine wrapper hookup
+	- Top integration tying together ingress, protocol parser, router, Wishbone master, IO engines, and TX arbiter/framer.
+- `fcsp_parser.sv` / `fcsp_crc_gate.sv`
+	- Stream parser, header decoder, and CRC validation path.
 - `fcsp_router.sv`
-	- AXIS-style channel router skeleton
-	- demuxes payload stream into CONTROL / TELEMETRY / FC_LOG / DEBUG_TRACE / ESC_SERIAL
-- `fcsp_rx_fifo.sv` / `fcsp_tx_fifo.sv`
-	- AXIS-style FIFO wrapper skeletons
-	- preserve payload + metadata sideband contract while real buffering is brought in
-
-These are compile-safe skeletons intended to accelerate integration while legacy blocks are brought over.
-
+	- Demuxes validated payload stream into CONTROL (0x01) and ESC_SERIAL (0x05) channels.
+- `fcsp_wishbone_master.sv`
+	- Translates CONTROL payloads (READ/WRITE_BLOCK) into internal Wishbone B3 cycles.
+- `fcsp_tx_arbiter.sv` / `fcsp_tx_framer.sv`
+	- Priority multiplexer (CTRL > ESC > DBG) and FCSP wire formatter for response egress.
+- `fcsp_io_engines.sv`
+	- Wrapper seam for IO endpoints (DShot, PWM, NeoPixel, ESC UART) mapping them to the internal Wishbone bus or raw streams.
 ## Internal stream convention
 
 - Prefer **AXIS-style naming internally**: `tvalid/tready/tdata/tlast`

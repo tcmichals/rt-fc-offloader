@@ -146,48 +146,32 @@ It should not be treated as a requirement that the FCSP FPGA internals must look
 
 | GPIO | Pin # | Signal             | Direction     | Function                                  | Source File       |
 |------|-------|--------------------|---------------|-------------------------------------------|-------------------|
-| 0    | 1     | PWM Ch1            | Input         | RC PWM input channel 1                    | `pwm_decode.h`    |
-| 1    | 2     | PWM Ch2            | Input         | RC PWM input channel 2                    | `pwm_decode.h`    |
-| 2    | 4     | PWM Ch3            | Input         | RC PWM input channel 3                    | `pwm_decode.h`    |
-| 3    | 5     | PWM Ch4            | Input         | RC PWM input channel 4                    | `pwm_decode.h`    |
-| 4    | 6     | PWM Ch5            | Input         | RC PWM input channel 5                    | `pwm_decode.h`    |
-| 5    | 7     | PWM Ch6            | Input         | RC PWM input channel 6                    | `pwm_decode.h`    |
 | 6    | 9     | Motor1             | Bidirectional | DShot output / ESC serial passthrough     | `dshot.h`         |
 | 7    | 10    | Motor2             | Bidirectional | DShot output / ESC serial passthrough     | `dshot.h`         |
 | 8    | 11    | Motor3             | Bidirectional | DShot output / ESC serial passthrough     | `dshot.h`         |
 | 9    | 12    | Motor4             | Bidirectional | DShot output / ESC serial passthrough     | `dshot.h`         |
 | 10   | 14    | NeoPixel           | Output        | WS2812/SK6812 RGBW data (16 LEDs)         | `neopixel.h`      |
-| 16   | 21    | SPI0 MOSI          | Input         | SPI slave data in (from host)             | `spi_slave.cpp`   |
-| 17   | 22    | SPI0 CS            | Input         | SPI slave chip select (from host)         | `spi_slave.cpp`   |
-| 18   | 24    | SPI0 SCLK          | Input         | SPI slave clock (from host)               | `spi_slave.cpp`   |
-| 19   | 25    | SPI0 MISO          | Output        | SPI slave data out (to host)              | `spi_slave.cpp`   |
 | 20   | 26    | Debug UART1 TX     | Output        | Debug console output @ 115200 baud        | `debug_uart.cpp`  |
 | 25   | —     | On-board LED       | Output        | Heartbeat blink (~1 Hz); internal, no header pin | `pico_main.cpp`   |
 
+> **Note:** PWM decoding (GPIO 0-5) and SPI slave (GPIO 16-19) are handled by the FPGA. The Pico firmware focuses on MSP/USB, DShot output, and ESC passthrough via PIO.
+
 ### Unassigned GPIOs
 
-GPIOs 11–15, 21–24, and 26–28 are currently unused.
+GPIOs 0–5, 11–15, 16–19, 21–24, and 26–28 are currently unused.
 
 ### Summary Diagram
 
 ```
-GPIO  0  (Pin  1) ── PWM Ch1 (RC input)
-GPIO  1  (Pin  2) ── PWM Ch2 (RC input)
-GPIO  2  (Pin  4) ── PWM Ch3 (RC input)
-GPIO  3  (Pin  5) ── PWM Ch4 (RC input)
-GPIO  4  (Pin  6) ── PWM Ch5 (RC input)
-GPIO  5  (Pin  7) ── PWM Ch6 (RC input)
 GPIO  6  (Pin  9) ── Motor 1 (DShot / ESC passthrough)
 GPIO  7  (Pin 10) ── Motor 2 (DShot / ESC passthrough)
 GPIO  8  (Pin 11) ── Motor 3 (DShot / ESC passthrough)
 GPIO  9  (Pin 12) ── Motor 4 (DShot / ESC passthrough)
 GPIO 10  (Pin 14) ── NeoPixel data (WS2812/SK6812 RGBW)
-GPIO 16  (Pin 21) ── SPI0 MOSI (host link)
-GPIO 17  (Pin 22) ── SPI0 CS   (host link)
-GPIO 18  (Pin 24) ── SPI0 SCLK (host link)
-GPIO 19  (Pin 25) ── SPI0 MISO (host link)
 GPIO 20  (Pin 26) ── Debug UART1 TX (115200 baud)
 GPIO 25  (internal) ── On-board LED (heartbeat)
+
+Note: GPIO 0-5 (PWM) and GPIO 16-19 (SPI) are handled by FPGA
 ```
 
 ## Building the Pico Firmware
